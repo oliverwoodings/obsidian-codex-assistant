@@ -1,36 +1,23 @@
-import {App, PluginSettingTab, Setting} from "obsidian";
-import MyPlugin from "./main";
+import type { PluginData, SkillDefinition } from "./types";
 
-export interface MyPluginSettings {
-	mySetting: string;
-}
-
-export const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
-
-export class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
+const DEFAULT_SKILLS: SkillDefinition[] = [
+	{
+		id: "summarize-note",
+		name: "Summarize this note",
+		prompt: "Summarize the active note and its surrounding context as concisely as possible.",
+		rules: {}
 	}
+];
 
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
-}
+export const DEFAULT_SETTINGS: PluginData = {
+	skills: DEFAULT_SKILLS,
+	lastSessionId: "",
+	managedSessionIds: [],
+	insertMode: "cursor",
+	transcripts: {},
+	codexBinaryPath: "codex",
+	selectedModel: "gpt-5.3-codex",
+	selectedReasoningEffort: "high",
+	sandboxMode: "read-only",
+	executionLog: []
+};

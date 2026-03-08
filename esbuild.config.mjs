@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import { builtinModules } from 'node:module';
+import { readFile } from "node:fs/promises";
 
 const banner =
 `/*
@@ -10,6 +11,19 @@ if you want to view the source, please visit the github repository of this plugi
 `;
 
 const prod = (process.argv[2] === "production");
+
+const codexSdkImportMetaShim = {
+	name: "codex-sdk-import-meta-shim",
+	setup(build) {
+		build.onLoad({ filter: /[\\/]@openai[\\/]codex-sdk[\\/]dist[\\/]index\.js$/ }, async (args) => {
+			const source = await readFile(args.path, "utf8");
+			return {
+				contents: source.replace("createRequire(import.meta.url)", "createRequire(__filename)"),
+				loader: "js"
+			};
+		});
+	}
+};
 
 const context = await esbuild.context({
 	banner: {
@@ -39,6 +53,7 @@ const context = await esbuild.context({
 	treeShaking: true,
 	outfile: "main.js",
 	minify: prod,
+	plugins: [codexSdkImportMetaShim],
 });
 
 if (prod) {

@@ -1,90 +1,130 @@
-# Obsidian Sample Plugin
+# Quick Skills (obsidian-quick-skills)
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+Quick Skills is an Obsidian desktop-only sidebar assistant built explicitly for Codex-native workflows:
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+- manual chat in a dockable sidebar,
+- reusable note-aware skills,
+- plugin-managed Codex sessions,
+- live structured activity streaming,
+- raw event logging for debugging.
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+## Install and run (development)
 
-## First time developing plugins?
+1. Copy this plugin into `<Vault>/.obsidian/plugins/obsidian-quick-skills/`.
+2. Install dependencies with `npm install`.
+3. Build once with `npm run build`.
+4. In Obsidian desktop, open **Settings → Community plugins** and enable **Quick Skills**.
 
-Quick starting guide for new plugin devs:
+For watch mode during development, run `npm run dev`.
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## Commands
 
-## Releasing new releases
+- `Quick Skills: Open Sidebar`
+- `Quick Skills: Run Skill…`
+- `Quick Skills: New Session`
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+The ribbon icon also opens the skill picker for the current note.
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+## Sidebar UX
 
-## Adding your plugin to the community plugin list
+The sidebar keeps the existing low-touch flow and now exposes richer Codex state while a run is active:
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+- session dropdown and **New** session,
+- manual chat input with **Enter** to send and **Shift+Enter** for newline,
+- model, reasoning, and mode selectors,
+- **Stop** to cancel an active run,
+- assistant actions: **Copy**, **Insert at cursor**, **Append to note**,
+- live assistant panels for:
+  - reasoning summaries,
+  - draft assistant text before the final response settles,
+  - structured activity cards for commands, todo updates, web searches, MCP calls, file changes, and item errors.
 
-## How to use
+Final assistant transcript content is derived only from completed assistant-message items, so transient agent chatter does not get prepended to the saved response unless Codex actually emits it as final content.
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+## Sessions
 
-## Manually installing the plugin
+Quick Skills keeps session isolation at the plugin level and does not expose every Codex session on disk:
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+- **New session** creates a plugin-owned placeholder handle.
+- The first streamed run starts a real Codex thread.
+- When Codex returns the real thread ID, the plugin adopts it and migrates the local transcript state.
+- The session dropdown only shows session IDs created or adopted by Quick Skills.
 
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
+Session metadata is enriched from `~/.codex/sessions`, but only for IDs already managed by the plugin.
 
-## Funding URL
+## Skills
 
-You can include funding URLs where people who use your plugin can financially support it.
+Skills are stored in plugin settings and support:
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+- `name`
+- `description`
+- `promptTemplate`
+- optional folder-prefix and frontmatter-tag applicability rules
+- favorites and manual ordering
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
-```
+Template variables:
 
-If you have multiple URLs, you can also do:
+- `{vault_root_path}`
+- `{active_file_path}`
+- `{selected_text}`
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+Applicability behavior:
 
-## API Documentation
+1. Rule-based skills must match to appear.
+2. Generic skills always appear.
+3. Matching rule-based skills rank ahead of generic ones, with favorites boosted within each group.
 
-See https://docs.obsidian.md
+## XML request packaging
+
+Every run still sends one canonical XML payload. The prompt is embedded in `<prompt><![CDATA[...]]></prompt>`.
+
+The payload includes:
+
+- vault root path,
+- active note path,
+- open note paths,
+- current editor selection,
+- standardized behavior instructions.
+
+It intentionally does not inline full note bodies or frontmatter content.
+
+## Codex-native architecture
+
+The runtime no longer uses a provider-agnostic backend abstraction. The plugin now talks directly to Codex through `@openai/codex-sdk`.
+
+Key modules:
+
+- `src/codex/service.ts`: Codex SDK integration, run lifecycle, cancellation, session creation, model catalog access.
+- `src/codex/streamAccumulator.ts`: structured event accumulation for live UX and final-response extraction.
+- `src/codex/sessionMetadata.ts`: managed-session enrichment from `~/.codex/sessions`.
+- `src/codex/modelCatalog.ts`: model/default discovery from `~/.codex/models_cache.json` and `~/.codex/config.toml`.
+
+Run behavior:
+
+- new sessions call `codex.startThread(...)`,
+- existing sessions call `codex.resumeThread(...)`,
+- the vault root is passed as Codex `workingDirectory`,
+- the mode selector maps to Codex sandbox mode,
+- reasoning selection maps to Codex `model_reasoning_effort`,
+- `skipGitRepoCheck` stays enabled,
+- raw reasoning is enabled through Codex config overrides so reasoning items remain visible during streaming.
+
+## Execution log browser
+
+The **Execution log** in settings is preserved and expanded. Each run stores:
+
+- prompt and canonical XML payload,
+- equivalent Codex invocation metadata,
+- resolved session id,
+- Codex SDK config metadata,
+- raw structured event objects for the full streamed turn,
+- final response, duration, and status.
+
+The log UI renders both pretty JSON config and a JSONL-style raw event stream so debugging stays possible without scraping CLI stdout.
+
+## Assumptions and migration notes
+
+- This plugin is desktop-only.
+- The Codex SDK spawns the configured executable directly. If Obsidian cannot resolve `codex` from its environment, set an absolute path in settings such as `/opt/homebrew/bin/codex`.
+- Existing saved transcripts continue to load.
+- Existing execution-log entries continue to load; new runs add structured event/config fields.
