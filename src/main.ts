@@ -755,6 +755,9 @@ export default class QuickSkillsPlugin extends Plugin {
 		this.settings.selectedModel = this.settings.selectedModel || DEFAULT_SETTINGS.selectedModel;
 		this.settings.selectedReasoningEffort = this.settings.selectedReasoningEffort || DEFAULT_SETTINGS.selectedReasoningEffort;
 		this.settings.sandboxMode = this.normalizeSandboxMode(this.settings.sandboxMode);
+		this.settings.whisperBaseUrl = this.normalizeWhisperBaseUrl(this.settings.whisperBaseUrl);
+		this.settings.whisperLanguage = this.normalizeWhisperLanguage(this.settings.whisperLanguage);
+		this.settings.whisperRequestTimeoutMs = this.normalizeWhisperRequestTimeout(this.settings.whisperRequestTimeoutMs);
 		this.settings.executionLog = this.normalizeExecutionLog(this.settings.executionLog);
 	}
 
@@ -979,6 +982,31 @@ export default class QuickSkillsPlugin extends Plugin {
 			return value;
 		}
 		return undefined;
+	}
+
+	private normalizeWhisperBaseUrl(value: unknown): string {
+		if (typeof value !== "string" || !value.trim()) {
+			return DEFAULT_SETTINGS.whisperBaseUrl;
+		}
+		return value.trim();
+	}
+
+	private normalizeWhisperLanguage(value: unknown): string {
+		return typeof value === "string" ? value.trim() : DEFAULT_SETTINGS.whisperLanguage;
+	}
+
+	private normalizeWhisperRequestTimeout(value: unknown): number {
+		if (typeof value !== "number" || !Number.isFinite(value)) {
+			return DEFAULT_SETTINGS.whisperRequestTimeoutMs;
+		}
+		const rounded = Math.round(value);
+		if (rounded < 5_000) {
+			return 5_000;
+		}
+		if (rounded > 300_000) {
+			return 300_000;
+		}
+		return rounded;
 	}
 
 	private resolveSkillReasoningEffort(skill: SkillDefinition): string | undefined {

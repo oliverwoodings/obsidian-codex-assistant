@@ -19,5 +19,8 @@ export const DEFAULT_SETTINGS: PluginData = {
 	selectedModel: "gpt-5.3-codex",
 	selectedReasoningEffort: "high",
 	sandboxMode: "read-only",
+	whisperBaseUrl: "http://127.0.0.1:8080",
+	whisperLanguage: "en",
+	whisperRequestTimeoutMs: 90_000,
 	executionLog: []
 };

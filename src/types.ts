@@ -147,5 +147,8 @@ export interface PluginData {
 	selectedModel: string;
 	selectedReasoningEffort: string;
 	sandboxMode: SandboxMode;
+	whisperBaseUrl: string;
+	whisperLanguage: string;
+	whisperRequestTimeoutMs: number;
 	executionLog: ExecutionLogEntry[];
 }

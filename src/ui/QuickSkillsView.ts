@@ -1,18 +1,26 @@
 import { ItemView, MarkdownRenderer, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import type QuickSkillsPlugin from "../main";
 import type { ChatActivity, ChatMessage, SandboxMode, SessionSummary } from "../types";
+import { DictationSession } from "../voice/dictationSession";
 import { SessionRenameModal } from "./SessionRenameModal";
 
 export const QUICK_SKILLS_VIEW_TYPE = "quick-skills-sidebar";
+const DICTATION_BAR_COUNT = 20;
+type DictationUiState = "idle" | "recording" | "transcribing";
 
 export class QuickSkillsView extends ItemView {
 	private readonly plugin: QuickSkillsPlugin;
 	private transcriptEl!: HTMLElement;
 	private inputEl!: HTMLTextAreaElement;
 	private sessionSelectEl!: HTMLSelectElement;
+	private optionControlsEl!: HTMLElement;
+	private dictationDisplayEl!: HTMLElement;
+	private dictationStatusEl!: HTMLElement;
+	private readonly dictationBars: HTMLElement[] = [];
 	private modelSelectEl!: HTMLSelectElement;
 	private reasoningSelectEl!: HTMLSelectElement;
 	private modeSelectEl!: HTMLSelectElement;
+	private micButton!: HTMLButtonElement;
 	private skillMenuEl!: HTMLDetailsElement;
 	private skillMenuPopoverEl!: HTMLElement;
 	private skillMenuTriggerEl!: HTMLElement;
@@ -21,6 +29,9 @@ export class QuickSkillsView extends ItemView {
 	private transcriptRenderVersion = 0;
 	private readonly expandedActivityIds = new Set<string>();
 	private readonly expandedReasoningMessageIds = new Set<string>();
+	private dictationState: DictationUiState = "idle";
+	private dictationSession: DictationSession | null = null;
+	private dictationLevels = Array.from({ length: DICTATION_BAR_COUNT }, () => 0);
 
 	constructor(leaf: WorkspaceLeaf, plugin: QuickSkillsPlugin) {
 		super(leaf);
@@ -123,9 +134,15 @@ export class QuickSkillsView extends ItemView {
 		this.autosizeInput();
 
 		const footer = composer.createDiv({ cls: "quick-skills-composer-toolbar" });
-		const optionControls = footer.createDiv({ cls: "quick-skills-toolbar-selects" });
+		this.optionControlsEl = footer.createDiv({ cls: "quick-skills-toolbar-selects" });
+		this.dictationDisplayEl = footer.createDiv({ cls: "quick-skills-dictation-display" });
+		this.dictationStatusEl = this.dictationDisplayEl.createDiv({ cls: "quick-skills-dictation-status" });
+		const dictationBarsEl = this.dictationDisplayEl.createDiv({ cls: "quick-skills-dictation-bars" });
+		for (let index = 0; index < DICTATION_BAR_COUNT; index += 1) {
+			this.dictationBars.push(dictationBarsEl.createDiv({ cls: "quick-skills-dictation-bar" }));
+		}
 
-		this.modelSelectEl = this.createCompactSelect(optionControls, "Model");
+		this.modelSelectEl = this.createCompactSelect(this.optionControlsEl, "Model");
 		this.modelSelectEl.addEventListener("change", () => {
 			void (async () => {
 				await this.plugin.setSelectedModel(this.modelSelectEl.value);
@@ -133,17 +150,25 @@ export class QuickSkillsView extends ItemView {
 			})();
 		});
 
-		this.reasoningSelectEl = this.createCompactSelect(optionControls, "Reasoning");
+		this.reasoningSelectEl = this.createCompactSelect(this.optionControlsEl, "Reasoning");
 		this.reasoningSelectEl.addEventListener("change", () => {
 			void this.plugin.setSelectedReasoningEffort(this.reasoningSelectEl.value);
 		});
 
-		this.modeSelectEl = this.createCompactSelect(optionControls, "Mode");
+		this.modeSelectEl = this.createCompactSelect(this.optionControlsEl, "Mode");
 		this.modeSelectEl.addEventListener("change", () => {
 			void this.plugin.setSandboxMode(this.modeSelectEl.value as SandboxMode);
 		});
 
 		const actionControls = footer.createDiv({ cls: "quick-skills-toolbar-actions" });
+		this.micButton = actionControls.createEl("button", {
+			cls: "quick-skills-toolbar-button quick-skills-toolbar-button-mic",
+			attr: { "aria-label": "Voice dictation", title: "Voice dictation" }
+		});
+		setIcon(this.micButton, "mic");
+		this.micButton.addEventListener("click", () => {
+			void this.toggleDictation();
+		});
 		this.skillMenuEl = actionControls.createEl("details", {
 			cls: "quick-skills-composer-skill-menu quick-skills-popover-menu"
 		});
@@ -195,13 +220,22 @@ export class QuickSkillsView extends ItemView {
 		this.renderReasoningOptions();
 		this.renderModeOptions();
 		this.renderSkillMenu();
+		this.renderDictationUi();
 		void this.renderTranscript();
-		this.skillMenuTriggerEl.toggleClass("is-disabled", this.plugin.isRunning);
-		this.skillMenuTriggerEl.setAttribute("aria-disabled", this.plugin.isRunning ? "true" : "false");
-		this.sendButton.disabled = this.plugin.isRunning;
+		const controlsBlocked = this.plugin.isRunning || this.isDictationBusy();
+		this.skillMenuTriggerEl.toggleClass("is-disabled", controlsBlocked);
+		this.skillMenuTriggerEl.setAttribute("aria-disabled", controlsBlocked ? "true" : "false");
+		if (controlsBlocked) {
+			this.skillMenuEl.removeAttribute("open");
+		}
+		this.sendButton.disabled = controlsBlocked;
 		this.sendButton.hidden = this.plugin.isRunning;
 		this.stopButton.hidden = !this.plugin.isRunning;
 		this.autosizeInput();
+	}
+
+	async onClose(): Promise<void> {
+		await this.teardownDictation();
 	}
 
 	private renderSessions(sessions: SessionSummary[]): void {
@@ -428,7 +462,7 @@ export class QuickSkillsView extends ItemView {
 			return;
 		}
 		this.skillMenuPopoverEl.empty();
-		if (this.plugin.isRunning) {
+		if (this.plugin.isRunning || this.isDictationBusy()) {
 			this.skillMenuEl.removeAttribute("open");
 		}
 		const applicableSkills = this.plugin.getApplicableSkills();
@@ -456,6 +490,9 @@ export class QuickSkillsView extends ItemView {
 	}
 
 	private async sendManualPrompt(): Promise<void> {
+		if (this.isDictationBusy()) {
+			return;
+		}
 		const prompt = this.inputEl.value.trim();
 		if (!prompt) {
 			return;
@@ -481,6 +518,133 @@ export class QuickSkillsView extends ItemView {
 			return "Write";
 		}
 		return "Danger";
+	}
+
+	private renderDictationUi(): void {
+		const dictationVisible = this.dictationState !== "idle";
+		this.optionControlsEl.hidden = dictationVisible;
+		this.dictationDisplayEl.hidden = !dictationVisible;
+		if (!this.micButton) {
+			return;
+		}
+		this.micButton.disabled = this.plugin.isRunning || this.dictationState === "transcribing";
+		this.micButton.toggleClass("is-recording", this.dictationState === "recording");
+		this.micButton.toggleClass("is-transcribing", this.dictationState === "transcribing");
+		this.micButton.setAttribute(
+			"title",
+			this.dictationState === "recording"
+				? "Stop dictation"
+				: (this.dictationState === "transcribing" ? "Transcribing..." : "Start dictation")
+		);
+		this.micButton.setAttribute(
+			"aria-label",
+			this.dictationState === "recording"
+				? "Stop dictation"
+				: (this.dictationState === "transcribing" ? "Transcribing..." : "Start dictation")
+		);
+		if (this.dictationState === "transcribing") {
+			setIcon(this.micButton, "loader");
+			this.dictationStatusEl.setText("Transcribing audio...");
+		} else {
+			setIcon(this.micButton, "mic");
+			this.dictationStatusEl.setText("Listening...");
+		}
+		this.renderDictationLevels();
+	}
+
+	private renderDictationLevels(): void {
+		this.dictationBars.forEach((bar, index) => {
+			const level = this.dictationLevels[index] ?? 0;
+			bar.style.setProperty("--quick-skills-dictation-level", `${Math.max(0.12, level)}`);
+		});
+	}
+
+	private async toggleDictation(): Promise<void> {
+		if (this.plugin.isRunning || this.dictationState === "transcribing") {
+			return;
+		}
+		if (this.dictationState === "recording") {
+			await this.stopDictation();
+			return;
+		}
+		await this.startDictation();
+	}
+
+	private async startDictation(): Promise<void> {
+		try {
+			this.dictationLevels = Array.from({ length: DICTATION_BAR_COUNT }, () => 0);
+			this.dictationSession = new DictationSession({
+				baseUrl: this.plugin.settings.whisperBaseUrl,
+				language: this.plugin.settings.whisperLanguage,
+				timeoutMs: this.plugin.settings.whisperRequestTimeoutMs
+			}, {
+				onLevel: (level) => {
+					this.pushDictationLevel(level);
+				}
+			});
+			await this.dictationSession.start();
+			this.dictationState = "recording";
+			this.render();
+		} catch (error) {
+			this.dictationSession = null;
+			this.dictationState = "idle";
+			new Notice(this.getErrorMessage(error, "Failed to start voice dictation."));
+			this.render();
+		}
+	}
+
+	private async stopDictation(): Promise<void> {
+		if (!this.dictationSession) {
+			this.dictationState = "idle";
+			this.render();
+			return;
+		}
+		this.dictationState = "transcribing";
+		this.render();
+		try {
+			const transcript = (await this.dictationSession.stopAndTranscribe()).trim();
+			if (!transcript) {
+				new Notice("No speech detected.");
+			} else {
+				this.appendDictationTranscript(transcript);
+			}
+		} catch (error) {
+			new Notice(this.getErrorMessage(error, "Voice dictation transcription failed."));
+		} finally {
+			this.dictationSession = null;
+			this.dictationState = "idle";
+			this.dictationLevels = Array.from({ length: DICTATION_BAR_COUNT }, () => 0);
+			this.render();
+		}
+	}
+
+	private appendDictationTranscript(transcript: string): void {
+		const existing = this.inputEl.value.trim();
+		this.inputEl.value = existing ? `${this.inputEl.value.trimEnd()}\n\n${transcript}` : transcript;
+		this.autosizeInput();
+		this.inputEl.focus();
+	}
+
+	private pushDictationLevel(level: number): void {
+		this.dictationLevels = [...this.dictationLevels.slice(1), level];
+		this.renderDictationLevels();
+	}
+
+	private async teardownDictation(): Promise<void> {
+		if (!this.dictationSession) {
+			return;
+		}
+		await this.dictationSession.abort();
+		this.dictationSession = null;
+		this.dictationState = "idle";
+	}
+
+	private isDictationBusy(): boolean {
+		return this.dictationState !== "idle";
+	}
+
+	private getErrorMessage(error: unknown, fallback: string): string {
+		return error instanceof Error && error.message.trim() ? error.message : fallback;
 	}
 
 	private summarizeNotePath(path: string): string {

@@ -39,6 +39,44 @@ export class QuickSkillsSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
+			.setName("Voice dictation")
+			.setHeading();
+
+		new Setting(containerEl)
+			.setName("Whisper base URL")
+			.setDesc("Shared local whisper.cpp runtime URL used for one-shot dictation.")
+			.addText((text) => text
+				.setPlaceholder("http://127.0.0.1:8080")
+				.setValue(this.plugin.settings.whisperBaseUrl)
+				.onChange(async (value) => {
+					this.plugin.settings.whisperBaseUrl = value.trim() || "http://127.0.0.1:8080";
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName("Whisper language")
+			.setDesc("Optional language hint for dictation, for example `en`. Leave blank to auto-detect.")
+			.addText((text) => text
+				.setPlaceholder("Optional, for example: en")
+				.setValue(this.plugin.settings.whisperLanguage)
+				.onChange(async (value) => {
+					this.plugin.settings.whisperLanguage = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName("Dictation timeout (ms)")
+			.setDesc("Timeout for the final whisper transcription request after recording stops.")
+			.addText((text) => text
+				.setPlaceholder("90000")
+				.setValue(String(this.plugin.settings.whisperRequestTimeoutMs))
+				.onChange(async (value) => {
+					const parsed = Number.parseInt(value.trim(), 10);
+					this.plugin.settings.whisperRequestTimeoutMs = Number.isFinite(parsed) ? parsed : 90_000;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
 			.setName("Create skill")
 			.setDesc("Add a reusable prompt")
 			.addButton((button) => button.setButtonText("New skill").setCta().onClick(() => {

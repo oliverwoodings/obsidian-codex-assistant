@@ -584,6 +584,48 @@
 	min-width: 0;
 }
 
+.quick-skills-toolbar-selects[hidden],
+.quick-skills-dictation-display[hidden] {
+	display: none !important;
+}
+
+.quick-skills-dictation-display {
+	flex: 1 1 220px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+	padding: 0 4px;
+}
+
+.quick-skills-dictation-status {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--text-muted);
+	white-space: nowrap;
+	flex: 0 0 auto;
+}
+
+.quick-skills-dictation-bars {
+	display: flex;
+	align-items: end;
+	gap: 4px;
+	flex: 1;
+	min-width: 0;
+	height: 26px;
+}
+
+.quick-skills-dictation-bar {
+	flex: 1 1 0;
+	min-width: 4px;
+	height: calc(8px + 18px * var(--quick-skills-dictation-level, 0.12));
+	border-radius: 999px;
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--interactive-accent) 78%, white 22%), color-mix(in srgb, var(--interactive-accent) 74%, var(--background-secondary) 26%));
+	transition: height 90ms ease;
+	opacity: 0.95;
+}
+
 .quick-skills-toolbar-select-wrap {
 	flex: 1 1 92px;
 	min-width: 84px;
@@ -630,6 +672,23 @@
 	background: color-mix(in srgb, var(--background-secondary) 90%, var(--interactive-accent) 10%);
 	border-color: color-mix(in srgb, var(--background-modifier-border) 72%, var(--interactive-accent) 28%);
 	color: var(--interactive-accent);
+}
+
+.quick-skills-toolbar-button-mic {
+	background: color-mix(in srgb, var(--background-secondary) 88%, var(--text-success) 12%);
+	border-color: color-mix(in srgb, var(--background-modifier-border) 72%, var(--text-success) 28%);
+	color: var(--text-success);
+}
+
+.quick-skills-toolbar-button-mic.is-recording {
+	background: color-mix(in srgb, var(--text-error) 16%, var(--background-secondary));
+	border-color: color-mix(in srgb, var(--text-error) 36%, var(--background-modifier-border));
+	color: var(--text-error);
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--text-error) 12%, transparent);
+}
+
+.quick-skills-toolbar-button-mic.is-transcribing {
+	color: var(--text-accent);
 }
 
 .quick-skills-toolbar-button-skill.is-disabled {
@@ -681,6 +740,10 @@
 }
 
 @media (max-width: 520px) {
+	.quick-skills-dictation-display {
+		width: 100%;
+	}
+
 	.quick-skills-toolbar-actions {
 		width: 100%;
 		justify-content: flex-end;

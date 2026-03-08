@@ -4,6 +4,7 @@ Quick Skills is an Obsidian desktop-only sidebar assistant built explicitly for 
 
 - manual chat in a dockable sidebar,
 - reusable note-aware skills,
+- one-shot local voice dictation via whisper.cpp,
 - plugin-managed Codex sessions,
 - live structured activity streaming,
 - raw event logging for debugging.
@@ -32,6 +33,8 @@ The sidebar keeps the existing low-touch flow and now exposes richer Codex state
 - session dropdown and **New** session,
 - manual chat input with **Enter** to send and **Shift+Enter** for newline,
 - model, reasoning, and mode selectors,
+- a voice dictation button that records first and transcribes after you stop,
+- a skill-run button that lists only skills applicable to the active note,
 - **Stop** to cancel an active run,
 - assistant actions: **Copy**, **Insert at cursor**, **Append to note**,
 - live assistant panels for:
@@ -57,22 +60,37 @@ Session metadata is enriched from `~/.codex/sessions`, but only for IDs already 
 Skills are stored in plugin settings and support:
 
 - `name`
-- `description`
-- `promptTemplate`
-- optional folder-prefix and frontmatter-tag applicability rules
-- favorites and manual ordering
-
-Template variables:
-
-- `{vault_root_path}`
-- `{active_file_path}`
-- `{selected_text}`
+- `prompt`
+- optional reasoning override
+- optional sandbox-mode override
+- optional folder-prefix rule
+- optional multi-tag frontmatter rule (`OR` matching)
+- manual ordering
 
 Applicability behavior:
 
 1. Rule-based skills must match to appear.
 2. Generic skills always appear.
-3. Matching rule-based skills rank ahead of generic ones, with favorites boosted within each group.
+3. Matching rule-based skills rank ahead of generic ones.
+
+## Voice dictation
+
+Quick Skills supports one-shot voice dictation in the sidebar composer:
+
+- click the microphone button to start recording,
+- while recording, the model/reasoning/mode selectors are replaced with a live audio meter,
+- click the microphone button again to stop,
+- the recorded audio is then transcribed once through a local whisper.cpp server and inserted into the composer for review before sending.
+
+This path is intentionally accuracy-first rather than realtime.
+
+Settings:
+
+- whisper base URL,
+- optional language hint,
+- final transcription timeout.
+
+By default this expects a shared local whisper runtime at `http://127.0.0.1:8080`.
 
 ## XML request packaging
 
@@ -126,5 +144,6 @@ The log UI renders both pretty JSON config and a JSONL-style raw event stream so
 
 - This plugin is desktop-only.
 - The Codex SDK spawns the configured executable directly. If Obsidian cannot resolve `codex` from its environment, set an absolute path in settings such as `/opt/homebrew/bin/codex`.
+- Voice dictation expects a local whisper.cpp HTTP server. This can be provided by the shared `whisper-local-runtime` repo or any compatible whisper.cpp server exposing `/inference`.
 - Existing saved transcripts continue to load.
 - Existing execution-log entries continue to load; new runs add structured event/config fields.
