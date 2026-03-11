@@ -77,6 +77,10 @@ export class QuickSkillsSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
+			.setName("Skills")
+			.setHeading();
+
+		new Setting(containerEl)
 			.setName("Create skill")
 			.setDesc("Add a reusable prompt")
 			.addButton((button) => button.setButtonText("New skill").setCta().onClick(() => {
