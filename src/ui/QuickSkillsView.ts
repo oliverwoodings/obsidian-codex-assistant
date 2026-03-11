@@ -1,6 +1,7 @@
 import { ItemView, MarkdownRenderer, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import type QuickSkillsPlugin from "../main";
-import type { ChatActivity, ChatMessage, SandboxMode, SessionSummary } from "../types";
+import { CodexStreamAccumulator } from "../codex/streamAccumulator";
+import type { ChatActivity, ChatMessage, ChatTraceItem, SandboxMode, SessionSummary } from "../types";
 import { DictationSession } from "../voice/dictationSession";
 import { SessionRenameModal } from "./SessionRenameModal";
 
@@ -28,7 +29,9 @@ export class QuickSkillsView extends ItemView {
 	private stopButton!: HTMLButtonElement;
 	private transcriptRenderVersion = 0;
 	private readonly expandedActivityIds = new Set<string>();
+	private readonly collapsedActivityIds = new Set<string>();
 	private readonly expandedReasoningMessageIds = new Set<string>();
+	private pendingScrollMessageId: string | null = null;
 	private dictationState: DictationUiState = "idle";
 	private dictationSession: DictationSession | null = null;
 	private dictationLevels = Array.from({ length: DICTATION_BAR_COUNT }, () => 0);
@@ -262,7 +265,10 @@ export class QuickSkillsView extends ItemView {
 		this.pruneExpandedReasoningMessageIds(messages);
 
 		for (const message of messages) {
-			const row = this.transcriptEl.createDiv({ cls: `quick-skills-row quick-skills-row-${message.role}` });
+			const row = this.transcriptEl.createDiv({
+				cls: `quick-skills-row quick-skills-row-${message.role}`,
+				attr: { "data-message-id": message.id }
+			});
 			const bubble = row.createDiv({ cls: `quick-skills-bubble quick-skills-bubble-${message.role}` });
 			const label = this.metaLabelForMessage(message);
 			const meta = label.length > 0 ? bubble.createDiv({ cls: "quick-skills-message-meta" }) : null;
@@ -270,50 +276,13 @@ export class QuickSkillsView extends ItemView {
 				meta.setText(label);
 			}
 
-			if (message.role === "assistant") {
-				bubble.addClass("quick-skills-bubble-has-actions");
-				const menuHost = meta ?? bubble;
-				const menu = menuHost.createEl("details", { cls: "quick-skills-actions-menu quick-skills-popover-menu" });
-				if (!meta) {
-					menu.addClass("quick-skills-actions-menu-overlay");
-				}
-				menu.addEventListener("toggle", () => {
-					if (menu.open) {
-						this.closeOpenPopoverMenus(menu);
-						this.updatePopoverDirection(menu);
-					}
-				});
-				const trigger = menu.createEl("summary", { cls: "quick-skills-actions-trigger" });
-				setIcon(trigger, "more-horizontal");
-				trigger.setAttribute("aria-label", "Assistant message actions");
-				const popover = menu.createDiv({ cls: "quick-skills-actions-popover" });
-				this.createActionButton(popover, "Copy", async () => {
-					await navigator.clipboard.writeText(message.content);
-					new Notice("Assistant message copied.");
-				}, menu);
-				this.createActionButton(popover, "Insert at cursor", async () => {
-					await this.plugin.insertIntoActiveNote(message.content, "cursor");
-				}, menu);
-				this.createActionButton(popover, "Append to note", async () => {
-					await this.plugin.insertIntoActiveNote(message.content, "append");
-				}, menu);
-				if (!message.isStreaming && this.hasStoredTurnTrace(message)) {
-					const reasoningLabel = this.expandedReasoningMessageIds.has(message.id) ? "Hide reasoning" : "Show reasoning";
-					this.createActionButton(popover, reasoningLabel, async () => {
-						this.toggleReasoning(message.id);
-					}, menu);
-				}
-			}
-
 			const content = bubble.createDiv({ cls: "quick-skills-message-content markdown-rendered" });
-			if (message.role === "assistant" && message.isStreaming) {
-				await this.renderAssistantStreamingState(content, message);
-			}
-			if (message.role === "assistant" && !message.isStreaming && this.expandedReasoningMessageIds.has(message.id)) {
-				await this.renderCompletedTurnTrace(content, message);
-			}
-			if (message.role === "assistant" && message.isStreaming && message.content.length === 0) {
-				// The structured live state above is the primary rendering while the final response is still pending.
+			if (message.role === "assistant") {
+				if (message.isStreaming) {
+					await this.renderAssistantStreamingState(content, message);
+				} else {
+					await this.renderAssistantCompletedState(content, message);
+				}
 			} else if (message.role === "skill") {
 				const pill = content.createDiv({ cls: "quick-skills-skill-pill" });
 				const iconEl = pill.createSpan({ cls: "quick-skills-skill-pill-icon" });
@@ -344,60 +313,106 @@ export class QuickSkillsView extends ItemView {
 			}
 		}
 
+		if (this.pendingScrollMessageId) {
+			const target = this.transcriptEl.querySelector<HTMLElement>(`.quick-skills-row[data-message-id="${this.pendingScrollMessageId}"]`);
+			if (target) {
+				this.transcriptEl.scrollTop = target.offsetTop - 8;
+			} else {
+				this.transcriptEl.scrollTop = this.transcriptEl.scrollHeight;
+			}
+			this.pendingScrollMessageId = null;
+			return;
+		}
+
 		this.transcriptEl.scrollTop = this.transcriptEl.scrollHeight;
 	}
 
 	private async renderAssistantStreamingState(container: HTMLElement, message: ChatMessage): Promise<void> {
+		const trace = this.getStoredTurnTrace(message);
 		const liveState = container.createDiv({ cls: "quick-skills-live-state" });
-		liveState.createDiv({
+		await this.renderTraceItems(liveState, trace.items);
+		const status = liveState.createDiv({ cls: "quick-skills-live-state-status" });
+		status.createSpan({
 			cls: "quick-skills-live-state-label",
-			text: message.content.length > 0 ? "Running..." : "Working..."
+			text: this.getStreamingStatusLabel(trace.items)
 		});
-		if (message.reasoningPreview) {
-			const section = liveState.createDiv({ cls: "quick-skills-live-section" });
-			section.createDiv({ cls: "quick-skills-live-section-label", text: "Reasoning" });
-			const reasoningContent = section.createDiv({ cls: "quick-skills-live-markdown markdown-rendered" });
-			await MarkdownRenderer.render(this.app, message.reasoningPreview, reasoningContent, "", this);
+	}
+
+	private async renderAssistantCompletedState(container: HTMLElement, message: ChatMessage): Promise<void> {
+		const hasTurnTrace = this.hasStoredTurnTrace(message);
+		const traceExpanded = hasTurnTrace && this.expandedReasoningMessageIds.has(message.id);
+		if (hasTurnTrace) {
+			this.renderTurnTraceToggle(container, message, traceExpanded);
 		}
-		if (message.draftPreview && message.draftPreview !== message.content) {
-			const section = liveState.createDiv({ cls: "quick-skills-live-section" });
-			section.createDiv({ cls: "quick-skills-live-section-label", text: "Draft" });
-			const draftContent = section.createDiv({ cls: "quick-skills-live-markdown markdown-rendered" });
-			await MarkdownRenderer.render(this.app, message.draftPreview, draftContent, "", this);
+		if (traceExpanded) {
+			const tracePanel = container.createDiv({ cls: "quick-skills-reasoning-panel" });
+			await this.renderTraceItems(tracePanel, this.getStoredTurnTrace(message).items);
+			this.renderMessageDivider(container, "Final message");
 		}
-		if (message.activities?.length) {
-			const activityList = liveState.createDiv({ cls: "quick-skills-activity-list" });
-			for (const activity of message.activities) {
-				this.renderActivityCard(activityList, activity);
+		const finalMessage = container.createDiv({ cls: "quick-skills-final-message" });
+		const finalContent = finalMessage.createDiv({ cls: "quick-skills-final-message-content markdown-rendered" });
+		await MarkdownRenderer.render(this.app, message.content, finalContent, "", this);
+		this.renderAssistantMessageActions(finalMessage, message);
+	}
+
+	private async renderTraceItems(
+		container: HTMLElement,
+		items: ChatTraceItem[]
+	): Promise<void> {
+		const traceItems = items.filter((item) => !!item.activity || !!item.text?.trim());
+		if (traceItems.length === 0) {
+			return;
+		}
+		for (const item of traceItems) {
+			if (item.kind === "activity" && item.activity) {
+				this.renderActivityCard(container, item.activity);
+				continue;
 			}
+			const text = item.text?.trim();
+			if (!text) {
+				continue;
+			}
+			const block = container.createDiv({
+				cls: item.kind === "reasoning"
+					? "quick-skills-trace-text quick-skills-trace-text-reasoning markdown-rendered"
+					: "quick-skills-trace-text quick-skills-trace-text-message markdown-rendered"
+			});
+			await MarkdownRenderer.render(this.app, text, block, "", this);
 		}
 	}
 
-	private async renderCompletedTurnTrace(container: HTMLElement, message: ChatMessage): Promise<void> {
-		const trace = this.getStoredTurnTrace(message);
-		if (!trace.reasoningText && trace.activities.length === 0 && trace.intermediaryMessages.length === 0) {
-			return;
-		}
-		const section = container.createDiv({ cls: "quick-skills-reasoning-panel" });
-		section.createDiv({ cls: "quick-skills-reasoning-panel-label", text: "Turn trace" });
-		if (trace.reasoningText) {
-			const reasoningSection = section.createDiv({ cls: "quick-skills-live-section" });
-			reasoningSection.createDiv({ cls: "quick-skills-live-section-label", text: "Reasoning" });
-			const reasoningContent = reasoningSection.createDiv({ cls: "quick-skills-live-markdown markdown-rendered" });
-			await MarkdownRenderer.render(this.app, trace.reasoningText, reasoningContent, "", this);
-		}
-		if (trace.activities.length > 0) {
-			const activityList = section.createDiv({ cls: "quick-skills-activity-list" });
-			for (const activity of trace.activities) {
-				this.renderActivityCard(activityList, activity);
+	private renderAssistantMessageActions(container: HTMLElement, message: ChatMessage): void {
+		const actions = container.createDiv({ cls: "quick-skills-message-actions-inline" });
+		this.createInlineMessageAction(actions, "copy", "Copy message", async () => {
+			await navigator.clipboard.writeText(message.content);
+			new Notice("Assistant message copied.");
+		});
+		this.createInlineMessageAction(actions, "file-pen", "Insert at cursor", async () => {
+			await this.plugin.insertIntoActiveNote(message.content, "cursor");
+		});
+		this.createInlineMessageAction(actions, "file-plus", "Append to note", async () => {
+			await this.plugin.insertIntoActiveNote(message.content, "append");
+		});
+	}
+
+	private createInlineMessageAction(
+		container: HTMLElement,
+		icon: string,
+		label: string,
+		action: () => Promise<void>
+	): void {
+		const button = container.createEl("button", {
+			cls: "quick-skills-message-action-icon",
+			attr: {
+				type: "button",
+				"aria-label": label,
+				title: label
 			}
-		}
-		for (const intermediaryMessage of trace.intermediaryMessages) {
-			const intermediarySection = section.createDiv({ cls: "quick-skills-live-section" });
-			intermediarySection.createDiv({ cls: "quick-skills-live-section-label", text: "Intermediary message" });
-			const intermediaryContent = intermediarySection.createDiv({ cls: "quick-skills-live-markdown markdown-rendered" });
-			await MarkdownRenderer.render(this.app, intermediaryMessage, intermediaryContent, "", this);
-		}
+		});
+		setIcon(button, icon);
+		button.addEventListener("click", () => {
+			void action();
+		});
 	}
 
 	private renderModelOptions(): void {
@@ -647,6 +662,44 @@ export class QuickSkillsView extends ItemView {
 		return error instanceof Error && error.message.trim() ? error.message : fallback;
 	}
 
+	private renderTurnTraceToggle(container: HTMLElement, message: ChatMessage, expanded: boolean): void {
+		const trace = this.getStoredTurnTrace(message);
+		const label = trace.durationMs && Number.isFinite(trace.durationMs)
+			? `Worked for ${this.formatDuration(trace.durationMs)}`
+			: "Worked";
+		const button = container.createDiv({ cls: "quick-skills-turn-trace-toggle" });
+		button.setAttribute("role", "button");
+		button.setAttribute("tabindex", "0");
+		button.setAttribute("aria-expanded", expanded ? "true" : "false");
+		button.toggleClass("is-expanded", expanded);
+		const leftRule = button.createSpan({ cls: "quick-skills-turn-trace-rule" });
+		leftRule.setAttribute("aria-hidden", "true");
+		button.createSpan({ cls: "quick-skills-turn-trace-label", text: label });
+		const chevronEl = button.createSpan({ cls: "quick-skills-turn-trace-chevron" });
+		setIcon(chevronEl, expanded ? "chevron-down" : "chevron-right");
+		const rightRule = button.createSpan({ cls: "quick-skills-turn-trace-rule" });
+		rightRule.setAttribute("aria-hidden", "true");
+		button.addEventListener("click", () => {
+			this.toggleReasoning(message.id);
+		});
+		button.addEventListener("keydown", (event: KeyboardEvent) => {
+			if (event.key !== "Enter" && event.key !== " ") {
+				return;
+			}
+			event.preventDefault();
+			this.toggleReasoning(message.id);
+		});
+	}
+
+	private renderMessageDivider(container: HTMLElement, label: string): void {
+		const divider = container.createDiv({ cls: "quick-skills-message-divider" });
+		const leftRule = divider.createSpan({ cls: "quick-skills-message-divider-rule" });
+		leftRule.setAttribute("aria-hidden", "true");
+		divider.createSpan({ cls: "quick-skills-message-divider-label", text: label });
+		const rightRule = divider.createSpan({ cls: "quick-skills-message-divider-rule" });
+		rightRule.setAttribute("aria-hidden", "true");
+	}
+
 	private summarizeNotePath(path: string): string {
 		const trimmed = path.trim();
 		if (!trimmed) {
@@ -660,7 +713,10 @@ export class QuickSkillsView extends ItemView {
 		return fileName.endsWith(".md") ? fileName.slice(0, -3) : fileName;
 	}
 
-	private renderActivityCard(container: HTMLElement, activity: ChatActivity): void {
+	private renderActivityCard(
+		container: HTMLElement,
+		activity: ChatActivity
+	): void {
 		const cardClass = `quick-skills-activity quick-skills-activity-${activity.status}`;
 		if (!activity.detail?.trim()) {
 			const card = container.createDiv({ cls: cardClass });
@@ -671,12 +727,14 @@ export class QuickSkillsView extends ItemView {
 		const detailsEl = container.createEl("details", {
 			cls: `${cardClass} quick-skills-activity-details`
 		});
-		detailsEl.open = this.expandedActivityIds.has(activity.id);
+		detailsEl.open = this.isActivityExpanded(activity.id);
 		detailsEl.addEventListener("toggle", () => {
 			if (detailsEl.open) {
 				this.expandedActivityIds.add(activity.id);
+				this.collapsedActivityIds.delete(activity.id);
 			} else {
 				this.expandedActivityIds.delete(activity.id);
+				this.collapsedActivityIds.add(activity.id);
 			}
 		});
 
@@ -688,6 +746,16 @@ export class QuickSkillsView extends ItemView {
 			text: activity.detail,
 			cls: "quick-skills-message-plain quick-skills-activity-detail"
 		});
+	}
+
+	private isActivityExpanded(activityId: string): boolean {
+		if (this.expandedActivityIds.has(activityId)) {
+			return true;
+		}
+		if (this.collapsedActivityIds.has(activityId)) {
+			return false;
+		}
+		return false;
 	}
 
 	private renderActivityHeader(container: HTMLElement, activity: ChatActivity): void {
@@ -740,13 +808,23 @@ export class QuickSkillsView extends ItemView {
 	private pruneExpandedActivityIds(messages: ChatMessage[]): void {
 		const visibleIds = new Set<string>();
 		for (const message of messages) {
-			for (const activity of message.activities ?? []) {
+			for (const item of message.turnTrace?.items ?? []) {
+				if (item.kind === "activity" && item.activity) {
+					visibleIds.add(item.activity.id);
+				}
+			}
+			for (const activity of message.turnTrace?.activities ?? []) {
 				visibleIds.add(activity.id);
 			}
 		}
 		for (const activityId of Array.from(this.expandedActivityIds)) {
 			if (!visibleIds.has(activityId)) {
 				this.expandedActivityIds.delete(activityId);
+			}
+		}
+		for (const activityId of Array.from(this.collapsedActivityIds)) {
+			if (!visibleIds.has(activityId)) {
+				this.collapsedActivityIds.delete(activityId);
 			}
 		}
 	}
@@ -769,6 +847,7 @@ export class QuickSkillsView extends ItemView {
 			this.expandedReasoningMessageIds.delete(messageId);
 		} else {
 			this.expandedReasoningMessageIds.add(messageId);
+			this.pendingScrollMessageId = messageId;
 		}
 		this.render();
 	}
@@ -821,26 +900,125 @@ export class QuickSkillsView extends ItemView {
 
 	private hasStoredTurnTrace(message: ChatMessage): boolean {
 		const trace = this.getStoredTurnTrace(message);
-		return !!trace.reasoningText || trace.activities.length > 0 || trace.intermediaryMessages.length > 0;
+		return trace.items.length > 0;
 	}
 
 	private getStoredTurnTrace(message: ChatMessage): {
-		reasoningText?: string;
-		activities: ChatActivity[];
-		intermediaryMessages: string[];
+		items: ChatTraceItem[];
+		durationMs?: number;
 	} {
+		const logTrace = this.getExecutionLogTrace(message);
+		if (logTrace) {
+			return logTrace;
+		}
+
+		const storedItems = (message.turnTrace?.items ?? [])
+			.map((item) => ({
+				id: item.id,
+				kind: item.kind,
+				text: item.text,
+				activity: item.activity ? { ...item.activity } : undefined,
+				isDraft: item.isDraft
+			}))
+			.filter((item) => !!item.activity || !!item.text?.trim());
+		if (storedItems.length > 0) {
+			return {
+				items: storedItems,
+				durationMs: message.turnTrace?.durationMs
+			};
+		}
+
+		const items: ChatTraceItem[] = [];
 		const reasoningText = message.turnTrace?.reasoningText?.trim() || message.reasoningTrace?.trim() || undefined;
-		const activities = message.turnTrace?.activities ?? [];
-		const completedMessages = message.turnTrace?.completedMessages ?? [];
-		const intermediaryMessages = completedMessages
-			.slice(0, -1)
-			.map((entry) => entry.trim())
-			.filter((entry) => entry.length > 0);
+		if (reasoningText) {
+			items.push({
+				id: `${message.id}-reasoning`,
+				kind: "reasoning",
+				text: reasoningText
+			});
+		}
+		for (const activity of message.turnTrace?.activities ?? []) {
+			items.push({
+				id: activity.id,
+				kind: "activity",
+				activity
+			});
+		}
+		for (const entry of (message.turnTrace?.completedMessages ?? []).slice(0, -1)) {
+			if (!entry.trim()) {
+				continue;
+			}
+			items.push({
+				id: `${message.id}-message-${items.length}`,
+				kind: "message",
+				text: entry
+			});
+		}
 		return {
-			reasoningText,
-			activities,
-			intermediaryMessages
+			items,
+			durationMs: message.turnTrace?.durationMs
 		};
+	}
+
+	private getExecutionLogTrace(message: ChatMessage): { items: ChatTraceItem[]; durationMs?: number } | null {
+		if (message.role !== "assistant" || message.isStreaming) {
+			return null;
+		}
+		const executionLog = this.plugin.getExecutionLogForAssistantMessage(message);
+		if (!executionLog || executionLog.rawEvents.length === 0) {
+			return null;
+		}
+		const accumulator = new CodexStreamAccumulator();
+		for (const rawEvent of executionLog.rawEvents) {
+			const payload = rawEvent.payload;
+			if (!payload || typeof payload !== "object" || typeof (payload as { type?: unknown }).type !== "string") {
+				continue;
+			}
+			accumulator.apply(payload as never);
+		}
+		const items = accumulator.getLiveState().traceItems;
+		if (items.length === 0) {
+			return null;
+		}
+		return {
+			items,
+			durationMs: Number.isFinite(executionLog.durationMs) ? executionLog.durationMs : message.turnTrace?.durationMs
+		};
+	}
+
+	private formatDuration(durationMs: number): string {
+		const totalSeconds = Math.max(1, Math.round(durationMs / 1000));
+		const minutes = Math.floor(totalSeconds / 60);
+		const seconds = totalSeconds % 60;
+		if (minutes <= 0) {
+			return `${seconds}s`;
+		}
+		if (seconds === 0) {
+			return `${minutes}m`;
+		}
+		return `${minutes}m ${seconds}s`;
+	}
+
+	private getStreamingStatusLabel(items: ChatTraceItem[]): string {
+		for (let index = items.length - 1; index >= 0; index -= 1) {
+			const item = items[index];
+			if (!item) {
+				continue;
+			}
+			if (item.kind === "activity" && item.activity) {
+				if (item.activity.kind === "todo_list") {
+					return "Updating plan";
+				}
+				return "Using tools";
+			}
+			if (item.kind === "message") {
+				return item.isDraft ? "Drafting response" : "Sharing progress";
+			}
+			if (item.kind === "reasoning") {
+				return "Thinking";
+			}
+		}
+		return "Working";
 	}
 
 	private createCompactSelect(container: HTMLElement, label: string): HTMLSelectElement {

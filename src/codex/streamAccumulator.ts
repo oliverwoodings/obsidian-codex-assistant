@@ -1,13 +1,10 @@
 import type { ThreadEvent, ThreadItem } from "@openai/codex-sdk";
-import type { ChatActivity, ChatActivityStatus } from "../types";
+import type { ChatActivity, ChatActivityStatus, ChatTraceItem } from "../types";
 
 const MAX_COMMAND_OUTPUT_CHARS = 1200;
 
 export interface CodexLiveState {
-	reasoningText: string;
-	draftText: string;
-	completedMessages: string[];
-	activities: ChatActivity[];
+	traceItems: ChatTraceItem[];
 }
 
 export interface StreamAccumulatorUpdate {
@@ -60,6 +57,10 @@ export class CodexStreamAccumulator {
 		return this.lastFinalContent;
 	}
 
+	getLiveState(): CodexLiveState {
+		return this.buildLiveState();
+	}
+
 	private trackItem(item: ThreadItem): void {
 		if (!this.itemsById.has(item.id)) {
 			this.itemOrder.push(item.id);
@@ -83,10 +84,8 @@ export class CodexStreamAccumulator {
 	}
 
 	private buildLiveState(): CodexLiveState {
-		const reasoningParts: string[] = [];
-		let latestDraftText = "";
-		const completedMessages: string[] = [];
-		const activities: ChatActivity[] = [];
+		const traceItems: ChatTraceItem[] = [];
+		const finalAssistantId = this.getFinalAssistantId();
 
 		for (const itemId of this.itemOrder) {
 			const item = this.itemsById.get(itemId);
@@ -96,7 +95,11 @@ export class CodexStreamAccumulator {
 			if (item.type === "reasoning") {
 				const text = item.text.trim();
 				if (text) {
-					reasoningParts.push(text);
+					traceItems.push({
+						id: item.id,
+						kind: "reasoning",
+						text: item.text
+					});
 				}
 				continue;
 			}
@@ -105,25 +108,44 @@ export class CodexStreamAccumulator {
 				if (!text) {
 					continue;
 				}
-				if (this.completedAssistantIds.has(itemId)) {
-					completedMessages.push(item.text);
-				} else {
-					latestDraftText = item.text;
+				if (this.completedAssistantIds.has(itemId) && item.id === finalAssistantId) {
+					continue;
 				}
+				traceItems.push({
+					id: item.id,
+					kind: "message",
+					text: item.text,
+					isDraft: !this.completedAssistantIds.has(itemId)
+				});
 				continue;
 			}
 			const activity = summarizeProgressItem(item);
 			if (activity) {
-				activities.push(activity);
+				traceItems.push({
+					id: item.id,
+					kind: "activity",
+					activity
+				});
 			}
 		}
 
 		return {
-			reasoningText: joinNonEmpty(reasoningParts, "\n\n"),
-			draftText: latestDraftText,
-			completedMessages,
-			activities
+			traceItems
 		};
+	}
+
+	private getFinalAssistantId(): string | null {
+		for (let index = this.itemOrder.length - 1; index >= 0; index -= 1) {
+			const itemId = this.itemOrder[index];
+			if (!itemId || !this.completedAssistantIds.has(itemId)) {
+				continue;
+			}
+			const item = this.itemsById.get(itemId);
+			if (item?.type === "agent_message" && item.text.trim()) {
+				return item.id;
+			}
+		}
+		return null;
 	}
 }
 
@@ -189,13 +211,6 @@ function summarizeProgressItem(item: ThreadItem): ChatActivity | null {
 		default:
 			return null;
 	}
-}
-
-function joinNonEmpty(parts: string[], separator: string): string {
-	return parts
-		.map((part) => part.trim())
-		.filter((part) => part.length > 0)
-		.join(separator);
 }
 
 function clampTail(value: string, maxChars: number): string {

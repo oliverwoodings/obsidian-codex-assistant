@@ -166,6 +166,17 @@ export default class QuickSkillsPlugin extends Plugin {
 		return this.sessions.find((session) => session.id === this.activeSessionId);
 	}
 
+	getExecutionLogForAssistantMessage(message: ChatMessage): ExecutionLogEntry | undefined {
+		if (message.executionLogId) {
+			return this.settings.executionLog.find((entry) => entry.id === message.executionLogId);
+		}
+		return this.settings.executionLog.find((entry) => (
+			entry.sessionId === this.activeSessionId &&
+			entry.response === message.content &&
+			Math.abs(entry.timestamp - message.timestamp) < 5 * 60 * 1000
+		));
+	}
+
 	async setSelectedModel(modelId: string): Promise<void> {
 		this.settings.selectedModel = modelId;
 		this.normalizeSelectedModelAndReasoning();
@@ -332,6 +343,7 @@ export default class QuickSkillsPlugin extends Plugin {
 			id: assistantMessageId,
 			role: "assistant",
 			content: "",
+			executionLogId: logId,
 			timestamp: Date.now(),
 			isStreaming: true
 		});
@@ -374,6 +386,8 @@ export default class QuickSkillsPlugin extends Plugin {
 			this.setExecutionLogSession(logId, result.sessionId);
 		}
 		const assistantMessage = this.findMessageById(assistantMessageId);
+		const durationMs = Date.now() - runStartedAt;
+		this.setAssistantTurnDuration(assistantMessageId, durationMs);
 		const finalStatus: ExecutionLogStatus = (this.cancelRequested || result.cancelled)
 			? "stopped"
 			: (result.errorMessage ? "error" : "success");
@@ -381,7 +395,7 @@ export default class QuickSkillsPlugin extends Plugin {
 			status: finalStatus,
 			response: result.finalContent || (assistantMessage?.content ?? ""),
 			errorMessage: result.errorMessage,
-			durationMs: Date.now() - runStartedAt
+			durationMs
 		});
 		this.isRunning = false;
 		this.currentRunLogId = null;
@@ -407,29 +421,16 @@ export default class QuickSkillsPlugin extends Plugin {
 		if (!message) {
 			return;
 		}
-		if (state.reasoningText) {
-			message.reasoningPreview = state.reasoningText;
-			message.reasoningTrace = state.reasoningText;
-		} else if (message.reasoningPreview) {
-			delete message.reasoningPreview;
-		} else if (message.reasoningTrace) {
-			delete message.reasoningTrace;
-		}
-		if (state.draftText) {
-			message.draftPreview = state.draftText;
-		} else if (message.draftPreview) {
-			delete message.draftPreview;
-		}
-		if (state.activities.length > 0) {
-			message.activities = state.activities;
-		} else if (message.activities) {
-			delete message.activities;
-		}
-		if (state.reasoningText || state.completedMessages.length > 0 || state.activities.length > 0) {
+		if (state.traceItems.length > 0) {
 			message.turnTrace = {
-				reasoningText: state.reasoningText || undefined,
-				completedMessages: state.completedMessages.length > 0 ? [...state.completedMessages] : undefined,
-				activities: state.activities.length > 0 ? [...state.activities] : undefined
+				items: state.traceItems.map((item) => ({
+					id: item.id,
+					kind: item.kind,
+					text: item.text,
+					activity: item.activity ? { ...item.activity } : undefined,
+					isDraft: item.isDraft
+				})),
+				durationMs: message.turnTrace?.durationMs
 			};
 		} else if (message.turnTrace) {
 			delete message.turnTrace;
@@ -443,17 +444,17 @@ export default class QuickSkillsPlugin extends Plugin {
 		const message = transcript.find((entry) => entry.id === messageId);
 		if (message) {
 			message.isStreaming = false;
-			if (message.reasoningPreview) {
-				delete message.reasoningPreview;
-			}
-			if (message.draftPreview) {
-				delete message.draftPreview;
-			}
-			if (message.activities) {
-				delete message.activities;
-			}
 		}
 		this.currentAssistantMessageId = null;
+	}
+
+	private setAssistantTurnDuration(messageId: string, durationMs: number): void {
+		const transcript = this.getCurrentTranscript();
+		const message = transcript.find((entry) => entry.id === messageId);
+		if (!message || !message.turnTrace) {
+			return;
+		}
+		message.turnTrace.durationMs = durationMs;
 	}
 
 	private pushMessage(message: ChatMessage): void {

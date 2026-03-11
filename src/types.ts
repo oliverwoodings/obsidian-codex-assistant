@@ -5,6 +5,7 @@ export interface ChatMessage {
 	role: MessageRole;
 	content: string;
 	timestamp: number;
+	executionLogId?: string;
 	isStreaming?: boolean;
 	skillName?: string;
 	activeNotePath?: string;
@@ -15,10 +16,22 @@ export interface ChatMessage {
 	turnTrace?: ChatTurnTrace;
 }
 
+export type ChatTraceItemKind = "reasoning" | "message" | "activity";
+
+export interface ChatTraceItem {
+	id: string;
+	kind: ChatTraceItemKind;
+	text?: string;
+	activity?: ChatActivity;
+	isDraft?: boolean;
+}
+
 export interface ChatTurnTrace {
+	items?: ChatTraceItem[];
 	reasoningText?: string;
 	completedMessages?: string[];
 	activities?: ChatActivity[];
+	durationMs?: number;
 }
 
 export type ChatActivityKind =
