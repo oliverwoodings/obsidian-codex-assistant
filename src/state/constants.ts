@@ -1,0 +1,1 @@
+export const MAX_EXECUTION_LOG_ENTRIES = 100;
