@@ -16,6 +16,7 @@ import type { QuickSkillsAppState } from "./appState";
 import { MAX_EXECUTION_LOG_ENTRIES } from "./constants";
 import type { SessionStore } from "./sessionStore";
 import type { SettingsRepository } from "./settingsRepository";
+import type { AppViewUpdate } from "./uiChange";
 
 interface RunMetadata {
 	requestKind: ExecutionLogRequestKind;
@@ -32,7 +33,7 @@ export class RunController {
 	private readonly codex: CodexService;
 	private readonly sessionStore: SessionStore;
 	private readonly settingsRepository: SettingsRepository;
-	private readonly refreshView: () => void;
+	private readonly notifyUi: (change: AppViewUpdate) => void;
 	private readonly notifyExecutionLogUpdated: () => void;
 
 	constructor(options: {
@@ -41,7 +42,7 @@ export class RunController {
 		codex: CodexService;
 		sessionStore: SessionStore;
 		settingsRepository: SettingsRepository;
-		refreshView: () => void;
+		notifyUi: (change: AppViewUpdate) => void;
 		notifyExecutionLogUpdated: () => void;
 	}) {
 		this.app = options.app;
@@ -49,7 +50,7 @@ export class RunController {
 		this.codex = options.codex;
 		this.sessionStore = options.sessionStore;
 		this.settingsRepository = options.settingsRepository;
-		this.refreshView = options.refreshView;
+		this.notifyUi = options.notifyUi;
 		this.notifyExecutionLogUpdated = options.notifyExecutionLogUpdated;
 	}
 
@@ -110,7 +111,7 @@ export class RunController {
 			this.sessionStore.finishAssistantMessage(this.state.currentAssistantMessageId);
 		}
 		this.settingsRepository.saveSoon(this.state.settings);
-		this.refreshView();
+		this.notifyUi("controls");
 	}
 
 	cancelExecutionLogRun(logId: string): boolean {
@@ -159,7 +160,7 @@ export class RunController {
 
 		this.state.isRunning = true;
 		this.state.cancelRequested = false;
-		this.refreshView();
+		this.notifyUi("controls");
 		const result = await this.codex.run({
 			xmlPayload,
 			sessionId: requestSessionId,
@@ -210,7 +211,7 @@ export class RunController {
 		this.state.currentRunLogId = null;
 		this.state.cancelRequested = false;
 		await this.settingsRepository.saveNow(this.state.settings);
-		this.refreshView();
+		this.notifyUi("controls");
 	}
 
 	private startExecutionLog(entry: {

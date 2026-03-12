@@ -738,6 +738,7 @@
 	flex-wrap: wrap;
 	gap: 6px;
 	min-width: 0;
+	order: 1;
 }
 
 .quick-skills-toolbar-selects[hidden],
@@ -752,6 +753,7 @@
 	gap: 10px;
 	min-width: 0;
 	padding: 0 4px;
+	order: 1;
 }
 
 .quick-skills-dictation-status {
@@ -805,6 +807,7 @@
 	align-items: center;
 	gap: 6px;
 	margin-left: auto;
+	order: 2;
 }
 
 .quick-skills-composer-skill-menu {

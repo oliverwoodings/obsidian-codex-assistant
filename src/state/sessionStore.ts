@@ -4,26 +4,27 @@ import type { CodexLiveState } from "../codex/streamAccumulator";
 import type { ChatMessage, SessionSummary } from "../types";
 import type { QuickSkillsAppState } from "./appState";
 import type { SettingsRepository } from "./settingsRepository";
+import type { AppViewUpdate } from "./uiChange";
 
 export class SessionStore {
 	private readonly app: App;
 	private readonly state: QuickSkillsAppState;
 	private readonly codex: CodexService;
 	private readonly settingsRepository: SettingsRepository;
-	private readonly refreshView: () => void;
+	private readonly notifyUi: (change: AppViewUpdate) => void;
 
 	constructor(options: {
 		app: App;
 		state: QuickSkillsAppState;
 		codex: CodexService;
 		settingsRepository: SettingsRepository;
-		refreshView: () => void;
+		notifyUi: (change: AppViewUpdate) => void;
 	}) {
 		this.app = options.app;
 		this.state = options.state;
 		this.codex = options.codex;
 		this.settingsRepository = options.settingsRepository;
-		this.refreshView = options.refreshView;
+		this.notifyUi = options.notifyUi;
 	}
 
 	async createAndSelectSession(): Promise<SessionSummary> {
@@ -45,7 +46,7 @@ export class SessionStore {
 			this.state.settings.transcripts[sessionId] = [];
 		}
 		await this.settingsRepository.saveNow(this.state.settings);
-		this.refreshView();
+		this.notifyUi("all");
 	}
 
 	getCurrentTranscript(): ChatMessage[] {
@@ -68,7 +69,7 @@ export class SessionStore {
 		}
 		this.state.settings.transcripts[this.state.activeSessionId]?.push(message);
 		this.settingsRepository.saveSoon(this.state.settings);
-		this.refreshView();
+		this.notifyUi("transcript");
 	}
 
 	replaceAssistantMessage(messageId: string, content: string): void {
@@ -78,7 +79,7 @@ export class SessionStore {
 		}
 		message.content = content;
 		this.settingsRepository.saveSoon(this.state.settings);
-		this.refreshView();
+		this.notifyUi("transcript");
 	}
 
 	setAssistantLiveState(messageId: string, liveState: CodexLiveState): void {
@@ -101,7 +102,7 @@ export class SessionStore {
 			delete message.turnTrace;
 		}
 		this.settingsRepository.saveSoon(this.state.settings);
-		this.refreshView();
+		this.notifyUi("transcript");
 	}
 
 	finishAssistantMessage(messageId: string): void {

@@ -15,6 +15,7 @@ import type { QuickSkillsAppState } from "./state/appState";
 import { RunController } from "./state/runController";
 import { SessionStore } from "./state/sessionStore";
 import { SettingsRepository } from "./state/settingsRepository";
+import type { AppViewUpdate } from "./state/uiChange";
 import { QuickSkillsSettingTab } from "./ui/QuickSkillsSettingTab";
 import { SkillPickerModal } from "./ui/SkillPickerModal";
 import { QUICK_SKILLS_VIEW_TYPE, QuickSkillsView } from "./ui/QuickSkillsView";
@@ -56,14 +57,14 @@ export default class QuickSkillsPlugin extends Plugin {
 		return this.state.isRunning;
 	}
 
-		async onload(): Promise<void> {
-			this.settingsRepository = new SettingsRepository({
-				loadData: async (): Promise<unknown> => {
-					const data: unknown = await this.loadData();
-					return data;
-				},
-				saveData: async (data) => await this.saveData(data)
-			});
+	async onload(): Promise<void> {
+		this.settingsRepository = new SettingsRepository({
+			loadData: async (): Promise<unknown> => {
+				const data: unknown = await this.loadData();
+				return data;
+			},
+			saveData: async (data) => await this.saveData(data)
+		});
 		this.state.settings = await this.settingsRepository.load();
 		this.codex = new CodexService(() => this.state.settings.codexBinaryPath || "codex");
 		this.sessionStore = new SessionStore({
@@ -71,7 +72,7 @@ export default class QuickSkillsPlugin extends Plugin {
 			state: this.state,
 			codex: this.codex,
 			settingsRepository: this.settingsRepository,
-			refreshView: () => this.refreshView()
+			notifyUi: (change) => this.refreshViews(change)
 		});
 		this.runController = new RunController({
 			app: this.app,
@@ -79,13 +80,18 @@ export default class QuickSkillsPlugin extends Plugin {
 			codex: this.codex,
 			sessionStore: this.sessionStore,
 			settingsRepository: this.settingsRepository,
-			refreshView: () => this.refreshView(),
+			notifyUi: (change) => this.refreshViews(change),
 			notifyExecutionLogUpdated: () => this.settingTab?.notifyExecutionLogUpdated()
 		});
 
 		await this.refreshModelCatalog();
 		this.captureFocusedNotePath();
-		this.registerEvent(this.app.workspace.on("active-leaf-change", () => {
+		this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
+			const markdownPath = leaf?.view instanceof MarkdownView ? (leaf.view.file?.path ?? null) : null;
+			if (markdownPath) {
+				this.updateFocusedNotePath(markdownPath);
+				return;
+			}
 			this.captureFocusedNotePath();
 		}));
 		this.registerEvent(this.app.workspace.on("file-open", (file) => {
@@ -94,6 +100,12 @@ export default class QuickSkillsPlugin extends Plugin {
 				return;
 			}
 			this.captureFocusedNotePath();
+		}));
+		this.registerEvent(this.app.metadataCache.on("changed", (file) => {
+			if (file.path !== this.state.lastFocusedNotePath) {
+				return;
+			}
+			this.refreshViews("skills");
 		}));
 		await this.sessionStore.refreshSessions();
 		this.registerView(QUICK_SKILLS_VIEW_TYPE, (leaf) => new QuickSkillsView(leaf, this));
@@ -146,7 +158,7 @@ export default class QuickSkillsPlugin extends Plugin {
 		}
 		await leaf.setViewState({ type: QUICK_SKILLS_VIEW_TYPE, active: true });
 		void this.app.workspace.revealLeaf(leaf);
-		this.refreshView();
+		this.refreshViews("all");
 	}
 
 	async createAndSelectSession(): Promise<void> {
@@ -190,17 +202,20 @@ export default class QuickSkillsPlugin extends Plugin {
 		this.state.settings.selectedModel = modelId;
 		this.normalizeSelectedModelAndReasoning();
 		await this.saveSettings();
+		this.refreshViews("controls");
 	}
 
 	async setSelectedReasoningEffort(reasoningEffort: string): Promise<void> {
 		this.state.settings.selectedReasoningEffort = reasoningEffort;
 		this.normalizeSelectedModelAndReasoning();
 		await this.saveSettings();
+		this.refreshViews("controls");
 	}
 
 	async setSandboxMode(mode: SandboxMode): Promise<void> {
 		this.state.settings.sandboxMode = mode;
 		await this.saveSettings();
+		this.refreshViews("controls");
 	}
 
 	async runManualPrompt(prompt: string): Promise<void> {
@@ -277,11 +292,11 @@ export default class QuickSkillsPlugin extends Plugin {
 		await this.settingsRepository.saveNow(this.state.settings);
 	}
 
-	private refreshView(): void {
+	private refreshViews(change: AppViewUpdate = "all"): void {
 		this.app.workspace.getLeavesOfType(QUICK_SKILLS_VIEW_TYPE).forEach((leaf) => {
 			const view = leaf.view;
 			if (view instanceof QuickSkillsView) {
-				view.render();
+				view.requestRender(change);
 			}
 		});
 	}
@@ -300,7 +315,7 @@ export default class QuickSkillsPlugin extends Plugin {
 			return;
 		}
 		this.state.lastFocusedNotePath = normalizedPath;
-		this.refreshView();
+		this.refreshViews("skills");
 	}
 
 	private getActiveFile(): TFile | null {
