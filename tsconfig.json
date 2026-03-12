@@ -5,6 +5,8 @@
 		"inlineSources": true,
 		"module": "ESNext",
 		"target": "ES6",
+		"jsx": "react-jsx",
+		"jsxImportSource": "preact",
 		"allowJs": true,
 		"noImplicitAny": true,
 		"noImplicitThis": true,
@@ -25,6 +27,7 @@
 		]
 	},
 	"include": [
-		"src/**/*.ts"
+		"src/**/*.ts",
+		"src/**/*.tsx"
 	]
 }

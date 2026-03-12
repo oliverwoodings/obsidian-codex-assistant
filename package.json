@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"@openai/codex-sdk": "^0.111.0",
-		"obsidian": "latest"
+		"obsidian": "latest",
+		"preact": "^10.29.0"
 	}
 }

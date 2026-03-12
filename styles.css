@@ -7,6 +7,14 @@
 	background: linear-gradient(180deg, var(--background-primary-alt), var(--background-primary));
 }
 
+.quick-skills-view-shell {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+	gap: 10px;
+}
+
 .quick-skills-topbar {
 	display: flex;
 	flex-direction: column;
@@ -736,9 +744,10 @@
 	display: flex;
 	flex: 1 1 220px;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: 2px;
 	min-width: 0;
 	order: 1;
+	align-items: center;
 }
 
 .quick-skills-toolbar-selects[hidden],
@@ -785,21 +794,57 @@
 }
 
 .quick-skills-toolbar-select-wrap {
-	flex: 1 1 92px;
-	min-width: 84px;
-	max-width: 140px;
+	position: relative;
+	flex: 0 1 auto;
+	min-width: 0;
+	max-width: none;
+	border-radius: 8px;
+	padding-right: 4px;
+	transition: background 140ms ease, color 140ms ease;
+}
+
+.quick-skills-toolbar-select-wrap::after {
+	content: "";
+	position: absolute;
+	right: 8px;
+	top: 50%;
+	width: 6px;
+	height: 6px;
+	border-right: 1.5px solid currentColor;
+	border-bottom: 1.5px solid currentColor;
+	transform: translateY(-65%) rotate(45deg);
+	pointer-events: none;
+	color: color-mix(in srgb, var(--text-muted) 88%, transparent);
+}
+
+.quick-skills-toolbar-select-wrap:hover,
+.quick-skills-toolbar-select-wrap:focus-within {
+	background: color-mix(in srgb, var(--background-modifier-hover) 72%, transparent);
 }
 
 .quick-skills-toolbar-select {
-	width: 100%;
-	height: 34px;
-	border-radius: 999px;
-	padding: 0 28px 0 12px;
-	border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, white 8%);
-	background: color-mix(in srgb, var(--background-secondary) 88%, transparent);
-	font-size: 12px;
-	font-weight: 600;
-	color: var(--text-muted);
+	width: auto;
+	min-width: 0;
+	height: 28px;
+	border-radius: 8px;
+	padding: 0 20px 0 8px;
+	border: none;
+	background: transparent;
+	font-size: 13px;
+	font-weight: 500;
+	color: color-mix(in srgb, var(--text-muted) 92%, var(--text-normal) 8%);
+	box-shadow: none;
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	cursor: pointer;
+}
+
+.quick-skills-toolbar-select:hover,
+.quick-skills-toolbar-select:focus-visible {
+	color: var(--text-normal);
+	outline: none;
+	box-shadow: none;
 }
 
 .quick-skills-toolbar-actions {
