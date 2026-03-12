@@ -157,6 +157,7 @@ export interface PluginData {
 	insertMode: "cursor" | "append";
 	transcripts: Record<string, ChatMessage[]>;
 	codexBinaryPath: string;
+	globalInstructions: string;
 	selectedModel: string;
 	selectedReasoningEffort: string;
 	sandboxMode: SandboxMode;

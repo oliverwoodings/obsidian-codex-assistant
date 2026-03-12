@@ -65,6 +65,7 @@ export class SettingsRepository {
 			settings.lastSessionId = settings.managedSessionIds[0] ?? "";
 		}
 		settings.codexBinaryPath = settings.codexBinaryPath || "codex";
+		settings.globalInstructions = this.normalizeGlobalInstructions(settings.globalInstructions);
 		settings.selectedModel = settings.selectedModel || DEFAULT_SETTINGS.selectedModel;
 		settings.selectedReasoningEffort = settings.selectedReasoningEffort || DEFAULT_SETTINGS.selectedReasoningEffort;
 		settings.sandboxMode = this.normalizeSandboxMode(settings.sandboxMode);
@@ -303,6 +304,10 @@ export class SettingsRepository {
 
 	private normalizeWhisperLanguage(value: unknown): string {
 		return typeof value === "string" ? value.trim() : DEFAULT_SETTINGS.whisperLanguage;
+	}
+
+	private normalizeGlobalInstructions(value: unknown): string {
+		return typeof value === "string" ? value : DEFAULT_SETTINGS.globalInstructions;
 	}
 
 	private normalizeWhisperRequestTimeout(value: unknown): number {

@@ -39,6 +39,21 @@ export class QuickSkillsSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
+			.setName("Global instructions")
+			.setDesc("Optional instructions applied to every prompt and skill run.")
+			.addTextArea((text) => {
+				text
+					.setPlaceholder("Add instructions that should apply to all runs")
+					.setValue(this.plugin.settings.globalInstructions)
+					.onChange(async (value) => {
+						this.plugin.settings.globalInstructions = value;
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.rows = 6;
+				text.inputEl.setCssProps({ width: "100%" });
+			});
+
+		new Setting(containerEl)
 			.setName("Voice dictation")
 			.setHeading();
 

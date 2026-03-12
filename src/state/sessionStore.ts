@@ -111,6 +111,8 @@ export class SessionStore {
 			message.isStreaming = false;
 		}
 		this.state.currentAssistantMessageId = null;
+		this.settingsRepository.saveSoon(this.state.settings);
+		this.notifyUi("transcript");
 	}
 
 	setAssistantTurnDuration(messageId: string, durationMs: number): void {
@@ -119,6 +121,8 @@ export class SessionStore {
 			return;
 		}
 		message.turnTrace.durationMs = durationMs;
+		this.settingsRepository.saveSoon(this.state.settings);
+		this.notifyUi("transcript");
 	}
 
 	findMessageById(messageId: string): ChatMessage | null {

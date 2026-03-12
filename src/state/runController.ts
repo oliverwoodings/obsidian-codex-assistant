@@ -65,7 +65,8 @@ export class RunController {
 		const xmlPayload = buildXmlPayload({
 			kind: "manual",
 			prompt,
-			context
+			context,
+			globalInstructions: this.state.settings.globalInstructions
 		});
 		await this.runRequest(xmlPayload, {
 			requestKind: "manual",
@@ -89,7 +90,8 @@ export class RunController {
 			kind: "skill",
 			skillName: skill.name,
 			prompt: renderedPrompt,
-			context
+			context,
+			globalInstructions: this.state.settings.globalInstructions
 		});
 		await this.runRequest(xmlPayload, {
 			requestKind: "skill",
