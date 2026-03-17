@@ -1,6 +1,6 @@
 import type { ModelCatalog, PluginData, SessionSummary } from "../types";
 
-export interface QuickSkillsAppState {
+export interface CodexAssistantAppState {
 	settings: PluginData;
 	sessions: SessionSummary[];
 	activeSessionId: string;

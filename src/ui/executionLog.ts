@@ -9,14 +9,14 @@ export function renderExecutionLog(
 	if (entries.length === 0) {
 		containerEl.createEl("p", {
 			text: "No runs recorded yet.",
-			cls: "quick-skills-settings-help"
+			cls: "codex-assistant-settings-help"
 		});
 		return;
 	}
 
-	const logContainer = containerEl.createDiv({ cls: "quick-skills-execution-log" });
+	const logContainer = containerEl.createDiv({ cls: "codex-assistant-execution-log" });
 	for (const entry of entries) {
-		const detailsEl = logContainer.createEl("details", { cls: "quick-skills-execution-log-item" });
+		const detailsEl = logContainer.createEl("details", { cls: "codex-assistant-execution-log-item" });
 		detailsEl.open = expandedEntryIds.has(entry.id);
 		detailsEl.addEventListener("toggle", () => {
 			if (detailsEl.open) {
@@ -26,7 +26,7 @@ export function renderExecutionLog(
 			}
 		});
 
-		const summaryEl = detailsEl.createEl("summary", { cls: "quick-skills-execution-log-summary" });
+		const summaryEl = detailsEl.createEl("summary", { cls: "codex-assistant-execution-log-summary" });
 		summaryEl.createSpan({
 			text: `${formatTimestamp(entry.timestamp)} - ${formatRequestType(entry)} - ${entry.sessionId} - ${formatDuration(entry.durationMs)}`
 		});
@@ -34,11 +34,11 @@ export function renderExecutionLog(
 		if (entry.status === "running") {
 			summaryEl.createSpan({
 				text: " (running)",
-				cls: "quick-skills-execution-log-running-label"
+				cls: "codex-assistant-execution-log-running-label"
 			});
 			const stopButtonEl = summaryEl.createEl("button", {
 				text: "Stop",
-				cls: "quick-skills-execution-log-stop-button"
+				cls: "codex-assistant-execution-log-stop-button"
 			});
 			stopButtonEl.type = "button";
 			stopButtonEl.addEventListener("click", (event) => {
@@ -50,22 +50,22 @@ export function renderExecutionLog(
 		} else if (entry.status === "stopped") {
 			summaryEl.createSpan({
 				text: " (stopped)",
-				cls: "quick-skills-execution-log-stopped-label"
+				cls: "codex-assistant-execution-log-stopped-label"
 			});
 		} else if (entry.status === "error") {
 			summaryEl.createSpan({
 				text: " (error)",
-				cls: "quick-skills-execution-log-error-label"
+				cls: "codex-assistant-execution-log-error-label"
 			});
 		}
 
-		const bodyEl = detailsEl.createDiv({ cls: "quick-skills-execution-log-body" });
-		bodyEl.createEl("div", { text: `Session: ${entry.sessionId}`, cls: "quick-skills-execution-log-label" });
-		bodyEl.createEl("div", { text: `Request type: ${formatRequestType(entry)}`, cls: "quick-skills-execution-log-label" });
-		bodyEl.createEl("div", { text: `Duration: ${formatDuration(entry.durationMs)}`, cls: "quick-skills-execution-log-label" });
+		const bodyEl = detailsEl.createDiv({ cls: "codex-assistant-execution-log-body" });
+		bodyEl.createEl("div", { text: `Session: ${entry.sessionId}`, cls: "codex-assistant-execution-log-label" });
+		bodyEl.createEl("div", { text: `Request type: ${formatRequestType(entry)}`, cls: "codex-assistant-execution-log-label" });
+		bodyEl.createEl("div", { text: `Duration: ${formatDuration(entry.durationMs)}`, cls: "codex-assistant-execution-log-label" });
 		bodyEl.createEl("div", {
 			text: `Structured events: ${entry.rawEvents.length}`,
-			cls: "quick-skills-execution-log-label"
+			cls: "codex-assistant-execution-log-label"
 		});
 
 		createExecutionLogTextSection(bodyEl, "Prompt", entry.prompt);
@@ -95,12 +95,12 @@ export function renderExecutionLog(
 }
 
 function createExecutionLogTextSection(containerEl: HTMLElement, label: string, value: string): void {
-	const labelRowEl = containerEl.createDiv({ cls: "quick-skills-execution-log-label-row" });
-	labelRowEl.createEl("div", { text: label, cls: "quick-skills-execution-log-label" });
+	const labelRowEl = containerEl.createDiv({ cls: "codex-assistant-execution-log-label-row" });
+	labelRowEl.createEl("div", { text: label, cls: "codex-assistant-execution-log-label" });
 
 	const copyButton = labelRowEl.createEl("button", {
 		text: "Copy",
-		cls: "quick-skills-execution-log-copy-button"
+		cls: "codex-assistant-execution-log-copy-button"
 	});
 	copyButton.type = "button";
 	copyButton.addEventListener("click", (event) => {
@@ -111,7 +111,7 @@ function createExecutionLogTextSection(containerEl: HTMLElement, label: string, 
 
 	const preEl = containerEl.createEl("pre", {
 		text: value,
-		cls: "quick-skills-execution-log-pre"
+		cls: "codex-assistant-execution-log-pre"
 	});
 	preEl.tabIndex = 0;
 }

@@ -1,17 +1,17 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
-import type QuickSkillsPlugin from "../main";
+import type CodexAssistantPlugin from "../main";
 import type { SkillDefinition } from "../types";
 import { SkillEditModal } from "./SkillEditModal";
 import { renderExecutionLog } from "./executionLog";
 
-export class QuickSkillsSettingTab extends PluginSettingTab {
-	private readonly plugin: QuickSkillsPlugin;
+export class CodexAssistantSettingTab extends PluginSettingTab {
+	private readonly plugin: CodexAssistantPlugin;
 	private executionLogContainerEl: HTMLElement | null = null;
 	private executionLogCountSetting: Setting | null = null;
 	private readonly expandedExecutionLogIds = new Set<string>();
 	private logRefreshTimeoutId: number | null = null;
 
-	constructor(app: App, plugin: QuickSkillsPlugin) {
+	constructor(app: App, plugin: CodexAssistantPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -128,7 +128,7 @@ export class QuickSkillsSettingTab extends PluginSettingTab {
 					this.refreshExecutionLogSection();
 				}));
 
-		this.executionLogContainerEl = containerEl.createDiv({ cls: "quick-skills-execution-log-section" });
+		this.executionLogContainerEl = containerEl.createDiv({ cls: "codex-assistant-execution-log-section" });
 		this.pruneExpandedExecutionLogIds();
 		renderExecutionLog(
 			this.executionLogContainerEl,
@@ -232,7 +232,7 @@ export class QuickSkillsSettingTab extends PluginSettingTab {
 		return scopeParts.length > 0 ? `${promptSummary} · ${scopeParts.join(" · ")}` : promptSummary;
 	}
 
-	private getSkillEditorOptions(): { reasoningOptions: string[]; sandboxModes: ReturnType<QuickSkillsPlugin["getAvailableSandboxModes"]> } {
+	private getSkillEditorOptions(): { reasoningOptions: string[]; sandboxModes: ReturnType<CodexAssistantPlugin["getAvailableSandboxModes"]> } {
 		return {
 			reasoningOptions: this.plugin.getReasoningOptionsForModel(this.plugin.settings.selectedModel),
 			sandboxModes: this.plugin.getAvailableSandboxModes()

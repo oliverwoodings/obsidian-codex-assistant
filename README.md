@@ -1,6 +1,6 @@
-# Quick Skills (obsidian-quick-skills)
+# Codex Assistant
 
-Quick Skills is an Obsidian desktop-only sidebar assistant built explicitly for Codex-native workflows:
+Codex Assistant is an Obsidian desktop-only sidebar assistant built explicitly for Codex-native workflows:
 
 - manual chat in a dockable sidebar,
 - reusable note-aware skills,
@@ -11,18 +11,18 @@ Quick Skills is an Obsidian desktop-only sidebar assistant built explicitly for 
 
 ## Install and run (development)
 
-1. Copy this plugin into `<Vault>/.obsidian/plugins/obsidian-quick-skills/`.
+1. Copy this plugin into `<Vault>/.obsidian/plugins/obsidian-codex-assistant/`.
 2. Install dependencies with `npm install`.
 3. Build once with `npm run build`.
-4. In Obsidian desktop, open **Settings → Community plugins** and enable **Quick Skills**.
+4. In Obsidian desktop, open **Settings → Community plugins** and enable **Codex Assistant**.
 
 For watch mode during development, run `npm run dev`.
 
 ## Commands
 
-- `Quick Skills: Open Sidebar`
-- `Quick Skills: Run Skill…`
-- `Quick Skills: New Session`
+- `Codex Assistant: Open sidebar`
+- `Codex Assistant: Run skill…`
+- `Codex Assistant: New session`
 
 The ribbon icon also opens the skill picker for the current note.
 
@@ -46,12 +46,12 @@ Final assistant transcript content is derived only from completed assistant-mess
 
 ## Sessions
 
-Quick Skills keeps session isolation at the plugin level and does not expose every Codex session on disk:
+Codex Assistant keeps session isolation at the plugin level and does not expose every Codex session on disk:
 
 - **New session** creates a plugin-owned placeholder handle.
 - The first streamed run starts a real Codex thread.
 - When Codex returns the real thread ID, the plugin adopts it and migrates the local transcript state.
-- The session dropdown only shows session IDs created or adopted by Quick Skills.
+- The session dropdown only shows session IDs created or adopted by Codex Assistant.
 
 Session metadata is enriched from `~/.codex/sessions`, but only for IDs already managed by the plugin.
 
@@ -75,7 +75,7 @@ Applicability behavior:
 
 ## Voice dictation
 
-Quick Skills supports one-shot voice dictation in the sidebar composer:
+Codex Assistant supports one-shot voice dictation in the sidebar composer:
 
 - click the microphone button to start recording,
 - while recording, the model/reasoning/mode selectors are replaced with a live audio meter,
@@ -147,3 +147,24 @@ The log UI renders both pretty JSON config and a JSONL-style raw event stream so
 - Voice dictation expects a local whisper.cpp HTTP server. This can be provided by the shared `whisper-local-runtime` repo or any compatible whisper.cpp server exposing `/inference`.
 - Existing saved transcripts continue to load.
 - Existing execution-log entries continue to load; new runs add structured event/config fields.
+
+## Manual migration from `obsidian-quick-skills`
+
+This rename is a clean break to the new plugin ID `obsidian-codex-assistant`.
+
+What changes:
+
+- the plugin folder changes from `.obsidian/plugins/obsidian-quick-skills/` to `.obsidian/plugins/obsidian-codex-assistant/`
+- saved data is now read from the new plugin folder
+- command IDs have changed, so hotkeys need to be rebound
+- the sidebar view type has changed, so existing workspace layout will not restore the old sidebar automatically
+
+To preserve settings and session transcripts:
+
+1. Disable **Quick Skills** in **Settings → Community plugins**.
+2. Copy or rename `.obsidian/plugins/obsidian-quick-skills/` to `.obsidian/plugins/obsidian-codex-assistant/`.
+3. Make sure the old `data.json` is copied into the new plugin folder if you want to preserve settings and local session state.
+4. Rebuild or replace the plugin files in the new folder.
+5. Enable **Codex Assistant**.
+6. Rebind any hotkeys for the renamed commands.
+7. Reopen the sidebar once so Obsidian stores the new view type in workspace state.

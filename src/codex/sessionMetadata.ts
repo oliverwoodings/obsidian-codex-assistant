@@ -32,7 +32,7 @@ interface SessionOverridesFile {
 }
 
 const SESSION_ROOT = join(homedir(), ".codex", "sessions");
-const SESSION_OVERRIDES_PATH = join(SESSION_ROOT, "quick-skills-session-overrides.json");
+const SESSION_OVERRIDES_PATH = join(SESSION_ROOT, "codex-assistant-session-overrides.json");
 
 export async function listKnownCodexSessions(): Promise<SessionSummary[]> {
 	const [rolloutFiles, overrides] = await Promise.all([

@@ -1,7 +1,7 @@
 import { ItemView, MarkdownRenderer, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import { render } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import type QuickSkillsPlugin from "../main";
+import type CodexAssistantPlugin from "../main";
 import { CodexStreamAccumulator } from "../codex/streamAccumulator";
 import type { AppViewUpdate } from "../state/uiChange";
 import type { ChatActivity, ChatMessage, ChatTraceItem, SandboxMode, SessionSummary, SkillDefinition } from "../types";
@@ -9,24 +9,24 @@ import { DictationSession } from "../voice/dictationSession";
 import { SessionRenameModal } from "./SessionRenameModal";
 import { closeOpenPopoverMenus, updatePopoverDirection } from "./sidebar/popover";
 
-export const QUICK_SKILLS_VIEW_TYPE = "quick-skills-sidebar";
+export const CODEX_ASSISTANT_VIEW_TYPE = "codex-assistant-sidebar";
 
-export class QuickSkillsView extends ItemView {
-	private readonly plugin: QuickSkillsPlugin;
+export class CodexAssistantView extends ItemView {
+	private readonly plugin: CodexAssistantPlugin;
 	private notifyRender: ((change: AppViewUpdate) => void) | null = null;
 
-	constructor(leaf: WorkspaceLeaf, plugin: QuickSkillsPlugin) {
+	constructor(leaf: WorkspaceLeaf, plugin: CodexAssistantPlugin) {
 		super(leaf);
 		this.plugin = plugin;
 	}
 
 	getViewType(): string {
-		return QUICK_SKILLS_VIEW_TYPE;
+		return CODEX_ASSISTANT_VIEW_TYPE;
 	}
 
 	getDisplayText(): string {
 		// eslint-disable-next-line obsidianmd/ui/sentence-case
-		return "Quick Skills";
+		return "Codex Assistant";
 	}
 
 	getIcon(): string {
@@ -36,10 +36,10 @@ export class QuickSkillsView extends ItemView {
 	async onOpen(): Promise<void> {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.addClass("quick-skills-view");
+		contentEl.addClass("codex-assistant-view");
 		this.registerDomEvent(document, "pointerdown", (event: PointerEvent) => {
 			const target = event.target;
-			if (target instanceof Element && target.closest(".quick-skills-popover-menu")) {
+			if (target instanceof Element && target.closest(".codex-assistant-popover-menu")) {
 				return;
 			}
 			closeOpenPopoverMenus(contentEl);
@@ -93,8 +93,8 @@ export class QuickSkillsView extends ItemView {
 }
 
 function SidebarApp(props: {
-	plugin: QuickSkillsPlugin;
-	view: QuickSkillsView;
+	plugin: CodexAssistantPlugin;
+	view: CodexAssistantView;
 	onReady: (notifyRender: (change: AppViewUpdate) => void) => void;
 }) {
 	const { plugin, view, onReady } = props;
@@ -169,7 +169,7 @@ function SidebarApp(props: {
 	useAutosizeTextArea(input);
 
 	return (
-		<div ref={contentRef} class="quick-skills-view-shell">
+		<div ref={contentRef} class="codex-assistant-view-shell">
 			<SessionHeader
 				plugin={plugin}
 				sessions={sessions}
@@ -216,7 +216,7 @@ function SidebarApp(props: {
 }
 
 function SessionHeader(props: {
-	plugin: QuickSkillsPlugin;
+	plugin: CodexAssistantPlugin;
 	sessions: SessionSummary[];
 	activeSessionId: string;
 	activeSession?: SessionSummary;
@@ -234,11 +234,11 @@ function SessionHeader(props: {
 	}, []);
 
 	return (
-		<div class="quick-skills-topbar">
-			<div class="quick-skills-topbar-label">Session</div>
-			<div class="quick-skills-session-group">
+		<div class="codex-assistant-topbar">
+			<div class="codex-assistant-topbar-label">Session</div>
+			<div class="codex-assistant-session-group">
 				<select
-						class="quick-skills-session-select"
+						class="codex-assistant-session-select"
 						value={activeSessionId}
 						onChange={(event) => {
 							void plugin.setActiveSession(event.currentTarget.value);
@@ -252,7 +252,7 @@ function SessionHeader(props: {
 				</select>
 				<details
 					ref={menuRef}
-					class="quick-skills-session-menu quick-skills-popover-menu"
+					class="codex-assistant-session-menu codex-assistant-popover-menu"
 					onToggle={() => {
 						if (!menuRef.current?.open || !contentEl) {
 							return;
@@ -263,13 +263,13 @@ function SessionHeader(props: {
 				>
 					<summary
 						ref={summaryRef}
-						class="quick-skills-session-menu-trigger"
+						class="codex-assistant-session-menu-trigger"
 						aria-label="Session actions"
 						title="Session actions"
 					/>
-					<div class="quick-skills-actions-popover quick-skills-session-menu-popover">
+					<div class="codex-assistant-actions-popover codex-assistant-session-menu-popover">
 						<button
-							class="quick-skills-actions-item"
+							class="codex-assistant-actions-item"
 							onClick={() => {
 								const sessionId = activeSession?.id ?? plugin.activeSessionId;
 								if (!sessionId) {
@@ -285,7 +285,7 @@ function SessionHeader(props: {
 							Rename
 						</button>
 						<button
-							class="quick-skills-actions-item"
+							class="codex-assistant-actions-item"
 							onClick={() => {
 								if (!plugin.activeSessionId) {
 									return;
@@ -299,7 +299,7 @@ function SessionHeader(props: {
 					</div>
 				</details>
 				<button
-					class="quick-skills-new-session-button"
+					class="codex-assistant-new-session-button"
 					onClick={() => {
 						void plugin.createAndSelectSession();
 					}}
@@ -312,8 +312,8 @@ function SessionHeader(props: {
 }
 
 function TranscriptPane(props: {
-	plugin: QuickSkillsPlugin;
-	view: QuickSkillsView;
+	plugin: CodexAssistantPlugin;
+	view: CodexAssistantView;
 	messages: ChatMessage[];
 	markdownSourcePath: string;
 	transcriptRef: { current: HTMLDivElement | null };
@@ -348,7 +348,7 @@ function TranscriptPane(props: {
 			return;
 		}
 		if (pendingScrollMessageId) {
-			const target = transcriptEl.querySelector<HTMLElement>(`.quick-skills-row[data-message-id="${pendingScrollMessageId}"]`);
+			const target = transcriptEl.querySelector<HTMLElement>(`.codex-assistant-row[data-message-id="${pendingScrollMessageId}"]`);
 			transcriptEl.scrollTop = target ? target.offsetTop - 8 : transcriptEl.scrollHeight;
 			onScrollHandled();
 			return;
@@ -357,7 +357,7 @@ function TranscriptPane(props: {
 	}, [messages, pendingScrollMessageId, transcriptRef, onScrollHandled]);
 
 	return (
-		<div ref={transcriptRef} class="quick-skills-transcript">
+		<div ref={transcriptRef} class="codex-assistant-transcript">
 			{messages.map((message) => (
 				<MessageRow
 					key={message.id}
@@ -380,8 +380,8 @@ function TranscriptPane(props: {
 }
 
 function MessageRow(props: {
-	plugin: QuickSkillsPlugin;
-	view: QuickSkillsView;
+	plugin: CodexAssistantPlugin;
+	view: CodexAssistantView;
 	message: ChatMessage;
 	markdownSourcePath: string;
 	expandedActivityIds: Set<string>;
@@ -406,15 +406,15 @@ function MessageRow(props: {
 	const trace = getStoredTurnTrace(plugin, message);
 
 	return (
-		<div class={`quick-skills-row quick-skills-row-${message.role}`} data-message-id={message.id}>
-			<div class={`quick-skills-bubble quick-skills-bubble-${message.role}`}>
+		<div class={`codex-assistant-row codex-assistant-row-${message.role}`} data-message-id={message.id}>
+			<div class={`codex-assistant-bubble codex-assistant-bubble-${message.role}`}>
 				{metaLabelForMessage(message) ? (
-					<div class="quick-skills-message-meta">{metaLabelForMessage(message)}</div>
+					<div class="codex-assistant-message-meta">{metaLabelForMessage(message)}</div>
 				) : null}
-				<div class="quick-skills-message-content markdown-rendered">
+				<div class="codex-assistant-message-content markdown-rendered">
 					{message.role === "assistant" ? (
 						message.isStreaming ? (
-							<div class="quick-skills-live-state">
+							<div class="codex-assistant-live-state">
 								<TraceItems
 									plugin={plugin}
 									view={view}
@@ -425,15 +425,15 @@ function MessageRow(props: {
 									setExpandedActivityIds={setExpandedActivityIds}
 									setCollapsedActivityIds={setCollapsedActivityIds}
 								/>
-								<div class="quick-skills-live-state-status">
-									<span class="quick-skills-live-state-label">{getStreamingStatusLabel(trace.items)}</span>
+								<div class="codex-assistant-live-state-status">
+									<span class="codex-assistant-live-state-label">{getStreamingStatusLabel(trace.items)}</span>
 								</div>
 							</div>
 						) : (
 							<div>
 								{trace.items.length > 0 ? (
 									<div
-										class={`quick-skills-turn-trace-toggle${traceExpanded ? " is-expanded" : ""}`}
+										class={`codex-assistant-turn-trace-toggle${traceExpanded ? " is-expanded" : ""}`}
 										role="button"
 										tabindex={0}
 										aria-expanded={traceExpanded ? "true" : "false"}
@@ -446,19 +446,19 @@ function MessageRow(props: {
 											onToggleReasoning();
 										}}
 									>
-										<span class="quick-skills-turn-trace-rule" aria-hidden="true" />
-										<span class="quick-skills-turn-trace-label">
+										<span class="codex-assistant-turn-trace-rule" aria-hidden="true" />
+										<span class="codex-assistant-turn-trace-label">
 											{trace.durationMs && Number.isFinite(trace.durationMs)
 												? `Worked for ${formatDuration(trace.durationMs)}`
 												: "Worked"}
 										</span>
-										<IconSpan icon={traceExpanded ? "chevron-down" : "chevron-right"} className="quick-skills-turn-trace-chevron" />
-										<span class="quick-skills-turn-trace-rule" aria-hidden="true" />
+										<IconSpan icon={traceExpanded ? "chevron-down" : "chevron-right"} className="codex-assistant-turn-trace-chevron" />
+										<span class="codex-assistant-turn-trace-rule" aria-hidden="true" />
 									</div>
 								) : null}
 								{traceExpanded ? (
 									<div>
-										<div class="quick-skills-reasoning-panel">
+										<div class="codex-assistant-reasoning-panel">
 											<TraceItems
 												plugin={plugin}
 												view={view}
@@ -470,22 +470,22 @@ function MessageRow(props: {
 												setCollapsedActivityIds={setCollapsedActivityIds}
 											/>
 										</div>
-										<div class="quick-skills-message-divider">
-											<span class="quick-skills-message-divider-rule" aria-hidden="true" />
-											<span class="quick-skills-message-divider-label">Final message</span>
-											<span class="quick-skills-message-divider-rule" aria-hidden="true" />
+										<div class="codex-assistant-message-divider">
+											<span class="codex-assistant-message-divider-rule" aria-hidden="true" />
+											<span class="codex-assistant-message-divider-label">Final message</span>
+											<span class="codex-assistant-message-divider-rule" aria-hidden="true" />
 										</div>
 									</div>
 								) : null}
-								<div class="quick-skills-final-message">
+								<div class="codex-assistant-final-message">
 									<MarkdownBlock
 										app={plugin.app}
 										sourcePath={markdownSourcePath}
 										host={view}
 										text={message.content}
-										className="quick-skills-final-message-content markdown-rendered"
+										className="codex-assistant-final-message-content markdown-rendered"
 									/>
-									<div class="quick-skills-message-actions-inline">
+									<div class="codex-assistant-message-actions-inline">
 										<ActionIcon
 											icon="copy"
 											label="Copy message"
@@ -513,21 +513,21 @@ function MessageRow(props: {
 							</div>
 						)
 					) : message.role === "skill" ? (
-						<div class="quick-skills-skill-pill">
-							<IconSpan icon="sparkles" className="quick-skills-skill-pill-icon" />
-							<div class="quick-skills-skill-pill-copy">
-								<div class="quick-skills-skill-pill-label">Skill</div>
-								<div class="quick-skills-skill-pill-name">{message.skillName?.trim() || "Unnamed skill"}</div>
+						<div class="codex-assistant-skill-pill">
+							<IconSpan icon="sparkles" className="codex-assistant-skill-pill-icon" />
+							<div class="codex-assistant-skill-pill-copy">
+								<div class="codex-assistant-skill-pill-label">Skill</div>
+								<div class="codex-assistant-skill-pill-name">{message.skillName?.trim() || "Unnamed skill"}</div>
 							</div>
 							{message.activeNotePath?.trim() ? (
-								<span class="quick-skills-skill-pill-meta">
-									<IconSpan icon="file-text" className="quick-skills-skill-pill-meta-icon" />
-									<span class="quick-skills-skill-pill-meta-label">{summarizeNotePath(message.activeNotePath)}</span>
+								<span class="codex-assistant-skill-pill-meta">
+									<IconSpan icon="file-text" className="codex-assistant-skill-pill-meta-icon" />
+									<span class="codex-assistant-skill-pill-meta-label">{summarizeNotePath(message.activeNotePath)}</span>
 								</span>
 							) : null}
 						</div>
 					) : message.role === "error" ? (
-						<pre class="quick-skills-message-plain">{message.content}</pre>
+						<pre class="codex-assistant-message-plain">{message.content}</pre>
 					) : (
 						<MarkdownBlock app={plugin.app} sourcePath={markdownSourcePath} host={view} text={message.content} />
 					)}
@@ -538,8 +538,8 @@ function MessageRow(props: {
 }
 
 function TraceItems(props: {
-	plugin: QuickSkillsPlugin;
-	view: QuickSkillsView;
+	plugin: CodexAssistantPlugin;
+	view: CodexAssistantView;
 	items: ChatTraceItem[];
 	markdownSourcePath: string;
 	expandedActivityIds: Set<string>;
@@ -601,8 +601,8 @@ function TraceItems(props: {
 							text={item.text ?? ""}
 							className={
 								item.kind === "reasoning"
-									? "quick-skills-trace-text quick-skills-trace-text-reasoning markdown-rendered"
-									: "quick-skills-trace-text quick-skills-trace-text-message markdown-rendered"
+									? "codex-assistant-trace-text codex-assistant-trace-text-reasoning markdown-rendered"
+									: "codex-assistant-trace-text codex-assistant-trace-text-message markdown-rendered"
 							}
 						/>
 					);
@@ -626,7 +626,7 @@ function ActivityCard(props: {
 
 	if (!activity.detail?.trim()) {
 		return (
-			<div class={`quick-skills-activity quick-skills-activity-${activity.status}`}>
+			<div class={`codex-assistant-activity codex-assistant-activity-${activity.status}`}>
 				<ActivityHeader activity={activity} />
 			</div>
 		);
@@ -635,16 +635,16 @@ function ActivityCard(props: {
 	return (
 		<details
 			ref={detailsRef}
-			class={`quick-skills-activity quick-skills-activity-${activity.status} quick-skills-activity-details`}
+			class={`codex-assistant-activity codex-assistant-activity-${activity.status} codex-assistant-activity-details`}
 			onToggle={() => {
 				onToggle(Boolean(detailsRef.current?.open));
 			}}
 		>
-			<summary class="quick-skills-activity-summary">
-				<IconSpan icon="chevron-right" className="quick-skills-activity-disclosure" />
+			<summary class="codex-assistant-activity-summary">
+				<IconSpan icon="chevron-right" className="codex-assistant-activity-disclosure" />
 				<ActivityHeader activity={activity} />
 			</summary>
-			<pre class="quick-skills-message-plain quick-skills-activity-detail">{activity.detail}</pre>
+			<pre class="codex-assistant-message-plain codex-assistant-activity-detail">{activity.detail}</pre>
 		</details>
 	);
 }
@@ -652,10 +652,10 @@ function ActivityCard(props: {
 function ActivityHeader(props: { activity: ChatActivity }) {
 	const { activity } = props;
 	return (
-		<span class="quick-skills-activity-header">
-			<IconSpan icon={iconForActivity(activity.kind)} className="quick-skills-activity-icon" />
-			<span class="quick-skills-activity-title" title={activity.title}>{activity.title}</span>
-			<span class={`quick-skills-activity-status quick-skills-activity-status-${activity.status}`}>
+		<span class="codex-assistant-activity-header">
+			<IconSpan icon={iconForActivity(activity.kind)} className="codex-assistant-activity-icon" />
+			<span class="codex-assistant-activity-title" title={activity.title}>{activity.title}</span>
+			<span class={`codex-assistant-activity-status codex-assistant-activity-status-${activity.status}`}>
 				{labelForActivityStatus(activity.status)}
 			</span>
 		</span>
@@ -663,7 +663,7 @@ function ActivityHeader(props: { activity: ChatActivity }) {
 }
 
 function Composer(props: {
-	plugin: QuickSkillsPlugin;
+	plugin: CodexAssistantPlugin;
 	input: string;
 	onInputChange: (value: string) => void;
 	controlsBlocked: boolean;
@@ -685,10 +685,10 @@ function Composer(props: {
 	}, []);
 
 	return (
-		<div class="quick-skills-composer">
+		<div class="codex-assistant-composer">
 			<textarea
 				ref={inputRef}
-				class="quick-skills-input"
+				class="codex-assistant-input"
 				placeholder="Ask anything..."
 				rows={1}
 					aria-label="Prompt input"
@@ -703,10 +703,10 @@ function Composer(props: {
 					}
 				}}
 			/>
-			<div class="quick-skills-composer-toolbar">
-				<div class="quick-skills-toolbar-actions">
+			<div class="codex-assistant-composer-toolbar">
+				<div class="codex-assistant-toolbar-actions">
 					<button
-						class={`quick-skills-toolbar-button quick-skills-toolbar-button-mic${dictation.state === "recording" ? " is-recording" : ""}${dictation.state === "transcribing" ? " is-transcribing" : ""}`}
+						class={`codex-assistant-toolbar-button codex-assistant-toolbar-button-mic${dictation.state === "recording" ? " is-recording" : ""}${dictation.state === "transcribing" ? " is-transcribing" : ""}`}
 						aria-label={dictation.state === "recording" ? "Stop dictation" : (dictation.state === "transcribing" ? "Transcribing..." : "Start dictation")}
 						title={dictation.state === "recording" ? "Stop dictation" : (dictation.state === "transcribing" ? "Transcribing..." : "Start dictation")}
 						disabled={plugin.isRunning || dictation.state === "transcribing"}
@@ -718,7 +718,7 @@ function Composer(props: {
 					</button>
 					<details
 						ref={skillMenuRef}
-						class="quick-skills-composer-skill-menu quick-skills-popover-menu"
+						class="codex-assistant-composer-skill-menu codex-assistant-popover-menu"
 						onToggle={() => {
 							if (plugin.isRunning) {
 								skillMenuRef.current?.removeAttribute("open");
@@ -733,18 +733,18 @@ function Composer(props: {
 					>
 						<summary
 							ref={skillSummaryRef}
-							class={`quick-skills-toolbar-button quick-skills-toolbar-button-skill${controlsBlocked ? " is-disabled" : ""}`}
+							class={`codex-assistant-toolbar-button codex-assistant-toolbar-button-skill${controlsBlocked ? " is-disabled" : ""}`}
 							aria-label="Run skill"
 							title="Run skill"
 							aria-disabled={controlsBlocked ? "true" : "false"}
 						/>
-						<div class="quick-skills-actions-popover quick-skills-composer-skill-popover">
+						<div class="codex-assistant-actions-popover codex-assistant-composer-skill-popover">
 							{applicableSkills.length === 0 ? (
-								<div class="quick-skills-actions-empty" aria-disabled="true">No skills for this note</div>
+								<div class="codex-assistant-actions-empty" aria-disabled="true">No skills for this note</div>
 							) : applicableSkills.map((skill) => (
 								<button
 									key={skill.id}
-									class="quick-skills-actions-item"
+									class="codex-assistant-actions-item"
 									onClick={() => {
 										void plugin.runSkill(skill);
 										skillMenuRef.current?.removeAttribute("open");
@@ -756,7 +756,7 @@ function Composer(props: {
 						</div>
 					</details>
 					<button
-						class="quick-skills-toolbar-button quick-skills-toolbar-button-send"
+						class="codex-assistant-toolbar-button codex-assistant-toolbar-button-send"
 						aria-label="Send prompt"
 						title="Send prompt"
 						disabled={controlsBlocked}
@@ -768,7 +768,7 @@ function Composer(props: {
 						<IconSpan icon="arrow-up" />
 					</button>
 					<button
-						class="quick-skills-toolbar-button quick-skills-toolbar-button-stop"
+						class="codex-assistant-toolbar-button codex-assistant-toolbar-button-stop"
 						aria-label="Stop run"
 						title="Stop run"
 						hidden={!plugin.isRunning}
@@ -779,7 +779,7 @@ function Composer(props: {
 						<IconSpan icon="square" />
 					</button>
 				</div>
-				<div class="quick-skills-toolbar-selects" hidden={dictation.state !== "idle"}>
+				<div class="codex-assistant-toolbar-selects" hidden={dictation.state !== "idle"}>
 					<CompactSelect
 						label="Model"
 						value={plugin.settings.selectedModel}
@@ -811,16 +811,16 @@ function Composer(props: {
 						}}
 					/>
 				</div>
-				<div class="quick-skills-dictation-display" hidden={dictation.state === "idle"}>
-					<div class="quick-skills-dictation-status">
+				<div class="codex-assistant-dictation-display" hidden={dictation.state === "idle"}>
+					<div class="codex-assistant-dictation-status">
 						{dictation.state === "transcribing" ? "Transcribing audio..." : "Listening..."}
 					</div>
-					<div class="quick-skills-dictation-bars">
+					<div class="codex-assistant-dictation-bars">
 						{dictation.levels.map((level, index) => (
 							<div
 								key={index}
-								class="quick-skills-dictation-bar"
-								style={{ "--quick-skills-dictation-level": `${Math.max(0.12, level)}` }}
+								class="codex-assistant-dictation-bar"
+								style={{ "--codex-assistant-dictation-level": `${Math.max(0.12, level)}` }}
 							/>
 						))}
 					</div>
@@ -840,9 +840,9 @@ function CompactSelect(props: {
 	const selectedLabel = options.find((option) => option.value === value)?.label ?? label;
 	const width = `calc(${Math.max(selectedLabel.length + 1, 5)}ch + 20px)`;
 	return (
-		<div class="quick-skills-toolbar-select-wrap" style={{ width }}>
+		<div class="codex-assistant-toolbar-select-wrap" style={{ width }}>
 			<select
-				class="quick-skills-toolbar-select"
+				class="codex-assistant-toolbar-select"
 				aria-label={label}
 				title={label}
 				value={value}
@@ -860,9 +860,9 @@ function CompactSelect(props: {
 }
 
 function MarkdownBlock(props: {
-	app: QuickSkillsPlugin["app"];
+	app: CodexAssistantPlugin["app"];
 	sourcePath: string;
-	host: QuickSkillsView;
+	host: CodexAssistantView;
 	text: string;
 	className?: string;
 }) {
@@ -894,7 +894,7 @@ function ActionIcon(props: { icon: string; label: string; onClick: () => Promise
 	const { icon, label, onClick } = props;
 	return (
 		<span
-			class="quick-skills-message-action-icon"
+			class="codex-assistant-message-action-icon"
 			role="button"
 			tabIndex={0}
 			aria-label={label}
@@ -933,7 +933,7 @@ interface DictationState {
 	toggle: () => Promise<void>;
 }
 
-function useDictation(plugin: QuickSkillsPlugin, setInput: (value: string | ((current: string) => string)) => void): DictationState {
+function useDictation(plugin: CodexAssistantPlugin, setInput: (value: string | ((current: string) => string)) => void): DictationState {
 	const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
 	const [levels, setLevels] = useState<number[]>(Array.from({ length: 20 }, () => 0));
 	const sessionRef = useRef<DictationSession | null>(null);
@@ -1007,17 +1007,17 @@ function useDictation(plugin: QuickSkillsPlugin, setInput: (value: string | ((cu
 
 function useAutosizeTextArea(value: string): void {
 	useEffect(() => {
-		const input = document.querySelector<HTMLTextAreaElement>(".quick-skills-input");
+		const input = document.querySelector<HTMLTextAreaElement>(".codex-assistant-input");
 		if (!input) {
 			return;
 		}
-		input.setCssProps({ "--quick-skills-input-height": "0px" });
+		input.setCssProps({ "--codex-assistant-input-height": "0px" });
 		const height = Math.min(Math.max(input.scrollHeight, 40), 160);
-		input.setCssProps({ "--quick-skills-input-height": `${height}px` });
+		input.setCssProps({ "--codex-assistant-input-height": `${height}px` });
 	}, [value]);
 }
 
-function getStoredTurnTrace(plugin: QuickSkillsPlugin, message: ChatMessage): { items: ChatTraceItem[]; durationMs?: number } {
+function getStoredTurnTrace(plugin: CodexAssistantPlugin, message: ChatMessage): { items: ChatTraceItem[]; durationMs?: number } {
 	const logTrace = getExecutionLogTrace(plugin, message);
 	if (logTrace) {
 		return logTrace;
@@ -1057,7 +1057,7 @@ function getStoredTurnTrace(plugin: QuickSkillsPlugin, message: ChatMessage): { 
 	return { items, durationMs: message.turnTrace?.durationMs };
 }
 
-function getExecutionLogTrace(plugin: QuickSkillsPlugin, message: ChatMessage): { items: ChatTraceItem[]; durationMs?: number } | null {
+function getExecutionLogTrace(plugin: CodexAssistantPlugin, message: ChatMessage): { items: ChatTraceItem[]; durationMs?: number } | null {
 	if (message.role !== "assistant" || message.isStreaming) {
 		return null;
 	}
@@ -1083,7 +1083,7 @@ function getExecutionLogTrace(plugin: QuickSkillsPlugin, message: ChatMessage): 
 	};
 }
 
-function hasStoredTurnTrace(plugin: QuickSkillsPlugin, message: ChatMessage): boolean {
+function hasStoredTurnTrace(plugin: CodexAssistantPlugin, message: ChatMessage): boolean {
 	return getStoredTurnTrace(plugin, message).items.length > 0;
 }
 

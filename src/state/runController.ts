@@ -12,7 +12,7 @@ import type {
 	SkillDefinition
 } from "../types";
 import { createId } from "../utils/id";
-import type { QuickSkillsAppState } from "./appState";
+import type { CodexAssistantAppState } from "./appState";
 import { MAX_EXECUTION_LOG_ENTRIES } from "./constants";
 import type { SessionStore } from "./sessionStore";
 import type { SettingsRepository } from "./settingsRepository";
@@ -29,7 +29,7 @@ interface RunMetadata {
 
 export class RunController {
 	private readonly app: App;
-	private readonly state: QuickSkillsAppState;
+	private readonly state: CodexAssistantAppState;
 	private readonly codex: CodexService;
 	private readonly sessionStore: SessionStore;
 	private readonly settingsRepository: SettingsRepository;
@@ -38,7 +38,7 @@ export class RunController {
 
 	constructor(options: {
 		app: App;
-		state: QuickSkillsAppState;
+		state: CodexAssistantAppState;
 		codex: CodexService;
 		sessionStore: SessionStore;
 		settingsRepository: SettingsRepository;

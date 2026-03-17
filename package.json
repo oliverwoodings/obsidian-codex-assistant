@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-quick-skills",
-	"version": "1.0.0",
-	"description": "Quick Skills Obsidian plugin",
+	"name": "obsidian-codex-assistant",
+	"version": "2.0.0",
+	"description": "Codex Assistant Obsidian sidebar plugin",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {

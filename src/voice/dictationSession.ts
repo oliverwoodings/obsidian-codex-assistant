@@ -10,10 +10,10 @@ interface DictationSessionHandlers {
 	onLevel?: (level: number) => void;
 }
 
-const WORKLET_PROCESSOR = "quick-skills-dictation-capture";
+const WORKLET_PROCESSOR = "codex-assistant-dictation-capture";
 const TARGET_SAMPLE_RATE = 16_000;
 const WORKLET_SOURCE = `
-class QuickSkillsDictationCaptureProcessor extends AudioWorkletProcessor {
+class CodexAssistantDictationCaptureProcessor extends AudioWorkletProcessor {
 	process(inputs) {
 		const firstInput = inputs[0];
 		const firstChannel = firstInput && firstInput[0];
@@ -24,7 +24,7 @@ class QuickSkillsDictationCaptureProcessor extends AudioWorkletProcessor {
 	}
 }
 
-registerProcessor('${WORKLET_PROCESSOR}', QuickSkillsDictationCaptureProcessor);
+registerProcessor('${WORKLET_PROCESSOR}', CodexAssistantDictationCaptureProcessor);
 `;
 
 export class DictationSession {

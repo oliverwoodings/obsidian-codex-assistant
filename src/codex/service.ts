@@ -189,7 +189,7 @@ function isAbortError(error: unknown): boolean {
 function formatRunError(error: unknown, executablePath: string): string {
 	if (error instanceof Error) {
 		if (error.message.includes("ENOENT") || error.message.includes("spawn")) {
-			return `Unable to launch Codex at "${executablePath}". Set an absolute executable path in Quick Skills settings if Obsidian cannot resolve \`codex\`.`;
+			return `Unable to launch Codex at "${executablePath}". Set an absolute executable path in Codex Assistant settings if Obsidian cannot resolve \`codex\`.`;
 		}
 		return error.message;
 	}

@@ -9,7 +9,7 @@ export interface WhisperInferenceRequest {
 }
 
 const DEFAULT_TIMEOUT_MS = 90_000;
-const MULTIPART_BOUNDARY_PREFIX = "----obsidian-quick-skills-";
+const MULTIPART_BOUNDARY_PREFIX = "----obsidian-codex-assistant-";
 
 export function normalizeWhisperBaseUrl(baseUrl: string): URL {
 	const trimmed = baseUrl.trim();

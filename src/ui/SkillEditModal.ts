@@ -46,24 +46,24 @@ export class SkillEditModal extends Modal {
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.empty();
-		this.modalEl.addClass("quick-skills-skill-modal-shell");
-		contentEl.addClass("quick-skills-skill-modal");
+		this.modalEl.addClass("codex-assistant-skill-modal-shell");
+		contentEl.addClass("codex-assistant-skill-modal");
 		contentEl.createEl("h3", { text: this.draft.name ? "Edit skill" : "Create skill" });
 
 		let nameInput: TextComponent | null = null;
 		let promptInput: TextAreaComponent | null = null;
 
-		const nameSection = contentEl.createDiv({ cls: "quick-skills-skill-editor-section" });
+		const nameSection = contentEl.createDiv({ cls: "codex-assistant-skill-editor-section" });
 		nameSection.createEl("label", {
-			cls: "quick-skills-skill-editor-label",
+			cls: "codex-assistant-skill-editor-label",
 			text: "Name"
 		});
 		nameSection.createEl("p", {
-			cls: "quick-skills-skill-editor-help",
+			cls: "codex-assistant-skill-editor-help",
 			text: "Short label shown in the skill picker."
 		});
 		nameInput = new TextComponent(nameSection);
-		nameInput.inputEl.addClass("quick-skills-skill-text-input");
+		nameInput.inputEl.addClass("codex-assistant-skill-text-input");
 		nameInput
 			.setPlaceholder("Summarize this note")
 			.setValue(this.draft.name)
@@ -71,17 +71,17 @@ export class SkillEditModal extends Modal {
 				this.draft.name = value;
 			});
 
-		const promptSection = contentEl.createDiv({ cls: "quick-skills-skill-editor-section" });
+		const promptSection = contentEl.createDiv({ cls: "codex-assistant-skill-editor-section" });
 		promptSection.createEl("label", {
-			cls: "quick-skills-skill-editor-label",
+			cls: "codex-assistant-skill-editor-label",
 			text: "Prompt"
 		});
 		promptSection.createEl("p", {
-			cls: "quick-skills-skill-editor-help",
+			cls: "codex-assistant-skill-editor-help",
 			text: "This text is sent exactly as written when you run the skill."
 		});
 			promptInput = new TextAreaComponent(promptSection);
-			promptInput.inputEl.addClass("quick-skills-skill-prompt-input");
+			promptInput.inputEl.addClass("codex-assistant-skill-prompt-input");
 			promptInput
 				.setPlaceholder("Prompt")
 				.setValue(this.draft.prompt)
@@ -90,13 +90,13 @@ export class SkillEditModal extends Modal {
 				});
 		promptInput.inputEl.rows = 12;
 
-		const rulesSection = contentEl.createDiv({ cls: "quick-skills-skill-editor-section" });
+		const rulesSection = contentEl.createDiv({ cls: "codex-assistant-skill-editor-section" });
 		rulesSection.createEl("label", {
-			cls: "quick-skills-skill-editor-label",
+			cls: "codex-assistant-skill-editor-label",
 			text: "Availability"
 		});
 		rulesSection.createEl("p", {
-			cls: "quick-skills-skill-editor-help",
+			cls: "codex-assistant-skill-editor-help",
 			text: "Optional note filters."
 		});
 
@@ -158,13 +158,13 @@ export class SkillEditModal extends Modal {
 		);
 		folderInput = folderRule.input;
 
-		const executionSection = contentEl.createDiv({ cls: "quick-skills-skill-editor-section" });
+		const executionSection = contentEl.createDiv({ cls: "codex-assistant-skill-editor-section" });
 		executionSection.createEl("label", {
-			cls: "quick-skills-skill-editor-label",
+			cls: "codex-assistant-skill-editor-label",
 			text: "Execution"
 		});
 		executionSection.createEl("p", {
-			cls: "quick-skills-skill-editor-help",
+			cls: "codex-assistant-skill-editor-help",
 			text: "Optional overrides. Leave unset to inherit the sidebar."
 		});
 
@@ -202,7 +202,7 @@ export class SkillEditModal extends Modal {
 			}
 		);
 
-		const footer = contentEl.createDiv({ cls: "quick-skills-skill-modal-footer" });
+		const footer = contentEl.createDiv({ cls: "codex-assistant-skill-modal-footer" });
 		const cancelButton = new ButtonComponent(footer);
 		cancelButton.setButtonText("Cancel").onClick(() => this.close());
 		const saveButton = new ButtonComponent(footer);
@@ -220,7 +220,7 @@ export class SkillEditModal extends Modal {
 	}
 
 	onClose(): void {
-		this.modalEl.removeClass("quick-skills-skill-modal-shell");
+		this.modalEl.removeClass("codex-assistant-skill-modal-shell");
 	}
 
 	private createRuleRow(
@@ -233,12 +233,12 @@ export class SkillEditModal extends Modal {
 		onToggle: (enabled: boolean) => void,
 		onInput: (value: string) => void
 	): { input: TextComponent; toggle: ToggleComponent } {
-		const row = container.createDiv({ cls: "quick-skills-skill-compact-row" });
-		const copy = row.createDiv({ cls: "quick-skills-skill-compact-copy" });
-		copy.createEl("div", { cls: "quick-skills-skill-compact-title", text: title });
-		copy.createEl("div", { cls: "quick-skills-skill-compact-hint", text: description });
-		const controls = row.createDiv({ cls: "quick-skills-skill-compact-controls quick-skills-skill-compact-controls-rule" });
-		const toggleWrap = controls.createDiv({ cls: "quick-skills-skill-rule-toggle" });
+		const row = container.createDiv({ cls: "codex-assistant-skill-compact-row" });
+		const copy = row.createDiv({ cls: "codex-assistant-skill-compact-copy" });
+		copy.createEl("div", { cls: "codex-assistant-skill-compact-title", text: title });
+		copy.createEl("div", { cls: "codex-assistant-skill-compact-hint", text: description });
+		const controls = row.createDiv({ cls: "codex-assistant-skill-compact-controls codex-assistant-skill-compact-controls-rule" });
+		const toggleWrap = controls.createDiv({ cls: "codex-assistant-skill-rule-toggle" });
 		const toggle = new ToggleComponent(toggleWrap);
 		toggle.setValue(enabled).onChange((nextValue) => {
 			onToggle(nextValue);
@@ -247,8 +247,8 @@ export class SkillEditModal extends Modal {
 		});
 
 		const input = new TextComponent(controls);
-		input.inputEl.addClass("quick-skills-skill-text-input");
-		input.inputEl.addClass("quick-skills-skill-compact-input");
+		input.inputEl.addClass("codex-assistant-skill-text-input");
+		input.inputEl.addClass("codex-assistant-skill-compact-input");
 		input
 			.setPlaceholder(placeholder)
 			.setValue(value)
@@ -268,13 +268,13 @@ export class SkillEditModal extends Modal {
 		options: Array<{ value: string; label: string }>,
 		onChange: (value: string) => void
 	): DropdownComponent {
-		const row = container.createDiv({ cls: "quick-skills-skill-compact-row" });
-		const copy = row.createDiv({ cls: "quick-skills-skill-compact-copy" });
-		copy.createEl("div", { cls: "quick-skills-skill-compact-title", text: title });
-		copy.createEl("div", { cls: "quick-skills-skill-compact-hint", text: description });
-		const selectWrap = row.createDiv({ cls: "quick-skills-skill-compact-controls" });
+		const row = container.createDiv({ cls: "codex-assistant-skill-compact-row" });
+		const copy = row.createDiv({ cls: "codex-assistant-skill-compact-copy" });
+		copy.createEl("div", { cls: "codex-assistant-skill-compact-title", text: title });
+		copy.createEl("div", { cls: "codex-assistant-skill-compact-hint", text: description });
+		const selectWrap = row.createDiv({ cls: "codex-assistant-skill-compact-controls" });
 		const select = new DropdownComponent(selectWrap);
-		select.selectEl.addClass("quick-skills-skill-select");
+		select.selectEl.addClass("codex-assistant-skill-select");
 		for (const option of options) {
 			select.addOption(option.value, option.label);
 		}

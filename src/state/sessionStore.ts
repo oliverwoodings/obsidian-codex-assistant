@@ -2,20 +2,20 @@ import type { App } from "obsidian";
 import type { CodexService } from "../codex/service";
 import type { CodexLiveState } from "../codex/streamAccumulator";
 import type { ChatMessage, SessionSummary } from "../types";
-import type { QuickSkillsAppState } from "./appState";
+import type { CodexAssistantAppState } from "./appState";
 import type { SettingsRepository } from "./settingsRepository";
 import type { AppViewUpdate } from "./uiChange";
 
 export class SessionStore {
 	private readonly app: App;
-	private readonly state: QuickSkillsAppState;
+	private readonly state: CodexAssistantAppState;
 	private readonly codex: CodexService;
 	private readonly settingsRepository: SettingsRepository;
 	private readonly notifyUi: (change: AppViewUpdate) => void;
 
 	constructor(options: {
 		app: App;
-		state: QuickSkillsAppState;
+		state: CodexAssistantAppState;
 		codex: CodexService;
 		settingsRepository: SettingsRepository;
 		notifyUi: (change: AppViewUpdate) => void;

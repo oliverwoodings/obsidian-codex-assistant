@@ -1,9 +1,9 @@
 {
-	"id": "obsidian-quick-skills",
-	"name": "Quick Skills",
-	"version": "1.0.0",
+	"id": "obsidian-codex-assistant",
+	"name": "Codex Assistant",
+	"version": "2.0.0",
 	"minAppVersion": "1.5.0",
 	"description": "Low-touch Codex-powered sidebar assistant with reusable skills and native sessions.",
-	"author": "Quick Skills",
+	"author": "Codex Assistant",
 	"isDesktopOnly": true
 }

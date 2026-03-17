@@ -11,19 +11,19 @@ import type {
 	SandboxMode,
 	SkillDefinition
 } from "./types";
-import type { QuickSkillsAppState } from "./state/appState";
+import type { CodexAssistantAppState } from "./state/appState";
 import { RunController } from "./state/runController";
 import { SessionStore } from "./state/sessionStore";
 import { SettingsRepository } from "./state/settingsRepository";
 import type { AppViewUpdate } from "./state/uiChange";
-import { QuickSkillsSettingTab } from "./ui/QuickSkillsSettingTab";
+import { CodexAssistantSettingTab } from "./ui/CodexAssistantSettingTab";
 import { SkillPickerModal } from "./ui/SkillPickerModal";
-import { QUICK_SKILLS_VIEW_TYPE, QuickSkillsView } from "./ui/QuickSkillsView";
+import { CODEX_ASSISTANT_VIEW_TYPE, CodexAssistantView } from "./ui/CodexAssistantView";
 
 const AVAILABLE_SANDBOX_MODES: SandboxMode[] = ["read-only", "workspace-write", "danger-full-access"];
 
-export default class QuickSkillsPlugin extends Plugin {
-	private readonly state: QuickSkillsAppState = {
+export default class CodexAssistantPlugin extends Plugin {
+	private readonly state: CodexAssistantAppState = {
 		settings: { ...DEFAULT_SETTINGS },
 		sessions: [],
 		activeSessionId: "",
@@ -39,7 +39,7 @@ export default class QuickSkillsPlugin extends Plugin {
 	private settingsRepository!: SettingsRepository;
 	private sessionStore!: SessionStore;
 	private runController!: RunController;
-	private settingTab: QuickSkillsSettingTab | null = null;
+	private settingTab: CodexAssistantSettingTab | null = null;
 
 	get settings(): PluginData {
 		return this.state.settings;
@@ -108,39 +108,39 @@ export default class QuickSkillsPlugin extends Plugin {
 			this.refreshViews("skills");
 		}));
 		await this.sessionStore.refreshSessions();
-		this.registerView(QUICK_SKILLS_VIEW_TYPE, (leaf) => new QuickSkillsView(leaf, this));
+		this.registerView(CODEX_ASSISTANT_VIEW_TYPE, (leaf) => new CodexAssistantView(leaf, this));
 
 		// eslint-disable-next-line obsidianmd/ui/sentence-case
-		this.addRibbonIcon("bot", "Quick Skills", () => {
+		this.addRibbonIcon("bot", "Codex Assistant", () => {
 			void this.openSkillPicker();
 		});
 
 		this.addCommand({
-			id: "quick-skills-open-sidebar",
+			id: "codex-assistant-open-sidebar",
 			// eslint-disable-next-line obsidianmd/commands/no-plugin-name-in-command-name, obsidianmd/ui/sentence-case
-			name: "Quick Skills: Open Sidebar",
+			name: "Codex Assistant: Open sidebar",
 			callback: () => {
 				void this.activateView();
 			}
 		});
 		this.addCommand({
-			id: "quick-skills-run-skill",
+			id: "codex-assistant-run-skill",
 			// eslint-disable-next-line obsidianmd/commands/no-plugin-name-in-command-name, obsidianmd/ui/sentence-case
-			name: "Quick Skills: Run Skill…",
+			name: "Codex Assistant: Run skill…",
 			callback: () => {
 				void this.openSkillPicker();
 			}
 		});
 		this.addCommand({
-			id: "quick-skills-new-session",
+			id: "codex-assistant-new-session",
 			// eslint-disable-next-line obsidianmd/commands/no-plugin-name-in-command-name, obsidianmd/ui/sentence-case
-			name: "Quick Skills: New Session",
+			name: "Codex Assistant: New session",
 			callback: () => {
 				void this.createAndSelectSession();
 			}
 		});
 
-		this.settingTab = new QuickSkillsSettingTab(this.app, this);
+		this.settingTab = new CodexAssistantSettingTab(this.app, this);
 		this.addSettingTab(this.settingTab);
 	}
 
@@ -150,14 +150,27 @@ export default class QuickSkillsPlugin extends Plugin {
 		this.settingTab = null;
 	}
 
+	onUserEnable(): void {
+		void this.ensureSidebarCreated();
+	}
+
 	async activateView(): Promise<void> {
-		const existing = this.app.workspace.getLeavesOfType(QUICK_SKILLS_VIEW_TYPE)[0];
-		const leaf = existing ?? this.app.workspace.getRightLeaf(false);
-		if (!leaf) {
-			return;
-		}
-		await leaf.setViewState({ type: QUICK_SKILLS_VIEW_TYPE, active: true });
-		void this.app.workspace.revealLeaf(leaf);
+		const leaf = await this.app.workspace.ensureSideLeaf(CODEX_ASSISTANT_VIEW_TYPE, "right", {
+			active: true,
+			reveal: true,
+			split: false
+		});
+		await leaf.setViewState({ type: CODEX_ASSISTANT_VIEW_TYPE, active: true });
+		this.refreshViews("all");
+	}
+
+	private async ensureSidebarCreated(): Promise<void> {
+		const leaf = await this.app.workspace.ensureSideLeaf(CODEX_ASSISTANT_VIEW_TYPE, "right", {
+			active: false,
+			reveal: false,
+			split: false
+		});
+		await leaf.setViewState({ type: CODEX_ASSISTANT_VIEW_TYPE, active: false });
 		this.refreshViews("all");
 	}
 
@@ -297,9 +310,9 @@ export default class QuickSkillsPlugin extends Plugin {
 	}
 
 	private refreshViews(change: AppViewUpdate = "all"): void {
-		this.app.workspace.getLeavesOfType(QUICK_SKILLS_VIEW_TYPE).forEach((leaf) => {
+		this.app.workspace.getLeavesOfType(CODEX_ASSISTANT_VIEW_TYPE).forEach((leaf) => {
 			const view = leaf.view;
-			if (view instanceof QuickSkillsView) {
+			if (view instanceof CodexAssistantView) {
 				view.requestRender(change);
 			}
 		});
