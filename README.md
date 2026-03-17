@@ -90,7 +90,7 @@ Settings:
 - optional language hint,
 - final transcription timeout.
 
-By default this expects a shared local whisper runtime at `http://127.0.0.1:8080`.
+By default this expects a shared local whisper runtime at `http://127.0.0.1:8080`. One option is [whisper-local-runtime](https://github.com/oliverwoodings/whisper-local-runtime).
 
 ## XML request packaging
 
@@ -144,27 +144,4 @@ The log UI renders both pretty JSON config and a JSONL-style raw event stream so
 
 - This plugin is desktop-only.
 - The Codex SDK spawns the configured executable directly. If Obsidian cannot resolve `codex` from its environment, set an absolute path in settings such as `/opt/homebrew/bin/codex`.
-- Voice dictation expects a local whisper.cpp HTTP server. This can be provided by the shared `whisper-local-runtime` repo or any compatible whisper.cpp server exposing `/inference`.
-- Existing saved transcripts continue to load.
-- Existing execution-log entries continue to load; new runs add structured event/config fields.
-
-## Manual migration from `obsidian-quick-skills`
-
-This rename is a clean break to the new plugin ID `obsidian-codex-assistant`.
-
-What changes:
-
-- the plugin folder changes from `.obsidian/plugins/obsidian-quick-skills/` to `.obsidian/plugins/obsidian-codex-assistant/`
-- saved data is now read from the new plugin folder
-- command IDs have changed, so hotkeys need to be rebound
-- the sidebar view type has changed, so existing workspace layout will not restore the old sidebar automatically
-
-To preserve settings and session transcripts:
-
-1. Disable **Quick Skills** in **Settings → Community plugins**.
-2. Copy or rename `.obsidian/plugins/obsidian-quick-skills/` to `.obsidian/plugins/obsidian-codex-assistant/`.
-3. Make sure the old `data.json` is copied into the new plugin folder if you want to preserve settings and local session state.
-4. Rebuild or replace the plugin files in the new folder.
-5. Enable **Codex Assistant**.
-6. Rebind any hotkeys for the renamed commands.
-7. Reopen the sidebar once so Obsidian stores the new view type in workspace state.
+- Voice dictation expects a local whisper.cpp HTTP server. This can be provided by [whisper-local-runtime](https://github.com/oliverwoodings/whisper-local-runtime) or any compatible whisper.cpp server exposing `/inference`.
