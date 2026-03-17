@@ -677,14 +677,11 @@
 	width: 24px;
 	height: 24px;
 	padding: 0;
-	border: none !important;
 	border-radius: 999px;
 	background: transparent;
 	box-shadow: none;
 	color: var(--text-muted);
 	cursor: pointer;
-	appearance: none;
-	-webkit-appearance: none;
 	opacity: 0.82;
 	transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
 }
@@ -693,7 +690,6 @@
 .quick-skills-message-action-icon:focus,
 .quick-skills-message-action-icon:focus-visible,
 .quick-skills-message-action-icon:active {
-	border: none !important;
 	background: var(--background-modifier-hover) !important;
 	box-shadow: none !important;
 	color: var(--text-normal);
