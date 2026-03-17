@@ -80,6 +80,10 @@ npm run build
 
 ## Testing
 
+- Run the automated suite with `npm run test` for nontrivial changes.
+- Use `npm run test:coverage` when you specifically need a coverage report.
+- Treat `npm run test:watch` as a manual convenience for humans, not the default agent workflow.
+- For release validation and real Obsidian wiring checks, follow [`docs/testing-smoke.md`](/Users/oliverwoodings/repos/personal/obsidian-quick-skills/docs/testing-smoke.md).
 - Manual install for testing: copy `main.js`, `manifest.json`, `styles.css` (if any) to:
   ```
   <Vault>/.obsidian/plugins/<plugin-id>/

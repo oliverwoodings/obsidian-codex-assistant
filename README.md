@@ -18,6 +18,16 @@ Codex Assistant is an Obsidian desktop-only sidebar assistant built explicitly f
 
 For watch mode during development, run `npm run dev`.
 
+## Testing
+
+Use the automated test suite during normal development:
+
+- `npm run test`
+- `npm run test:watch`
+- `npm run test:coverage`
+
+Before a release or after significant UI/plugin-shell changes, also run the manual Obsidian smoke checklist in [`docs/testing-smoke.md`](/Users/oliverwoodings/repos/personal/obsidian-quick-skills/docs/testing-smoke.md).
+
 ## Commands
 
 - `Codex Assistant: Open sidebar`

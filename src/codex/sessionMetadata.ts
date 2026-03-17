@@ -31,12 +31,9 @@ interface SessionOverridesFile {
 	sessions: Record<string, SessionOverride>;
 }
 
-const SESSION_ROOT = join(homedir(), ".codex", "sessions");
-const SESSION_OVERRIDES_PATH = join(SESSION_ROOT, "codex-assistant-session-overrides.json");
-
 export async function listKnownCodexSessions(): Promise<SessionSummary[]> {
 	const [rolloutFiles, overrides] = await Promise.all([
-		walkRolloutFiles(SESSION_ROOT),
+		walkRolloutFiles(getSessionRoot()),
 		readSessionOverrides()
 	]);
 	const byId = new Map<string, SessionFile>();
@@ -239,7 +236,7 @@ function normalizeWorkspaceLabel(cwd: string | undefined): string | undefined {
 
 async function readSessionOverrides(): Promise<SessionOverridesFile> {
 	try {
-		const raw = await readFile(SESSION_OVERRIDES_PATH, "utf8");
+		const raw = await readFile(getSessionOverridesPath(), "utf8");
 		const parsed = JSON.parse(raw) as Partial<SessionOverridesFile>;
 		const sessions = parsed.sessions;
 		if (!sessions || typeof sessions !== "object" || Array.isArray(sessions)) {
@@ -267,7 +264,7 @@ async function readSessionOverrides(): Promise<SessionOverridesFile> {
 async function writeSessionOverrides(overrides: SessionOverridesFile): Promise<void> {
 	await ensureSessionRoot();
 	const payload = JSON.stringify(overrides, null, 2);
-	await writeFile(SESSION_OVERRIDES_PATH, payload, "utf8");
+	await writeFile(getSessionOverridesPath(), payload, "utf8");
 }
 
 async function updateSessionOverride(
@@ -287,7 +284,7 @@ function emptySessionOverrides(): SessionOverridesFile {
 }
 
 async function ensureSessionRoot(): Promise<void> {
-	await mkdir(SESSION_ROOT, { recursive: true });
+	await mkdir(getSessionRoot(), { recursive: true });
 }
 
 function normalizeOverrideName(value: string | undefined): string | undefined {
@@ -295,4 +292,13 @@ function normalizeOverrideName(value: string | undefined): string | undefined {
 		return undefined;
 	}
 	return value.trim();
+}
+
+function getSessionRoot(): string {
+	const override = process.env.CODEX_ASSISTANT_SESSION_ROOT?.trim();
+	return override || join(homedir(), ".codex", "sessions");
+}
+
+function getSessionOverridesPath(): string {
+	return join(getSessionRoot(), "codex-assistant-session-overrides.json");
 }

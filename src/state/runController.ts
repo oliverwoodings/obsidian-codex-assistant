@@ -55,6 +55,7 @@ export class RunController {
 	}
 
 	async runManualPrompt(prompt: string): Promise<void> {
+		await this.ensureActiveSession();
 		const context = buildSessionContext(this.app, this.state.lastFocusedNotePath);
 		this.sessionStore.appendMessage({
 			id: createId("user"),
@@ -76,6 +77,7 @@ export class RunController {
 	}
 
 	async runSkill(skill: SkillDefinition, reasoningEffort?: string, sandboxMode?: SkillDefinition["sandboxMode"]): Promise<void> {
+		await this.ensureActiveSession();
 		const context = buildSessionContext(this.app, this.state.lastFocusedNotePath);
 		const renderedPrompt = skill.prompt.trim();
 		this.sessionStore.appendMessage({
@@ -136,9 +138,7 @@ export class RunController {
 	}
 
 	private async runRequest(xmlPayload: string, metadata: RunMetadata): Promise<void> {
-		if (!this.state.activeSessionId) {
-			await this.sessionStore.createAndSelectSession();
-		}
+		await this.ensureActiveSession();
 		const requestSessionId = this.state.activeSessionId;
 		const runStartedAt = Date.now();
 		const logId = this.startExecutionLog({
@@ -214,6 +214,12 @@ export class RunController {
 		this.state.cancelRequested = false;
 		await this.settingsRepository.saveNow(this.state.settings);
 		this.notifyUi("controls");
+	}
+
+	private async ensureActiveSession(): Promise<void> {
+		if (!this.state.activeSessionId) {
+			await this.sessionStore.createAndSelectSession();
+		}
 	}
 
 	private startExecutionLog(entry: {

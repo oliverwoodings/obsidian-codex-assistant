@@ -2,12 +2,23 @@ import { ItemView, MarkdownRenderer, Notice, setIcon, type WorkspaceLeaf } from 
 import { render } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type CodexAssistantPlugin from "../main";
-import { CodexStreamAccumulator } from "../codex/streamAccumulator";
 import type { AppViewUpdate } from "../state/uiChange";
 import type { ChatActivity, ChatMessage, ChatTraceItem, SandboxMode, SessionSummary, SkillDefinition } from "../types";
 import { DictationSession } from "../voice/dictationSession";
 import { SessionRenameModal } from "./SessionRenameModal";
 import { closeOpenPopoverMenus, updatePopoverDirection } from "./sidebar/popover";
+import {
+	formatDuration,
+	formatReasoningLabel,
+	formatSandboxModeShortLabel,
+	getErrorMessage,
+	getStreamingStatusLabel,
+	iconForActivity,
+	labelForActivityStatus,
+	metaLabelForMessage,
+	summarizeNotePath
+} from "./sidebar/viewHelpers";
+import { getStoredTurnTrace, hasStoredTurnTrace } from "./sidebar/traceHelpers";
 
 export const CODEX_ASSISTANT_VIEW_TYPE = "codex-assistant-sidebar";
 
@@ -1015,180 +1026,4 @@ function useAutosizeTextArea(value: string): void {
 		const height = Math.min(Math.max(input.scrollHeight, 40), 160);
 		input.setCssProps({ "--codex-assistant-input-height": `${height}px` });
 	}, [value]);
-}
-
-function getStoredTurnTrace(plugin: CodexAssistantPlugin, message: ChatMessage): { items: ChatTraceItem[]; durationMs?: number } {
-	const logTrace = getExecutionLogTrace(plugin, message);
-	if (logTrace) {
-		return logTrace;
-	}
-
-	const storedItems = (message.turnTrace?.items ?? [])
-		.map((item) => ({
-			id: item.id,
-			kind: item.kind,
-			text: item.text,
-			activity: item.activity ? { ...item.activity } : undefined,
-			isDraft: item.isDraft
-		}))
-		.filter((item) => !!item.activity || !!item.text?.trim());
-	if (storedItems.length > 0) {
-		return { items: storedItems, durationMs: message.turnTrace?.durationMs };
-	}
-
-	const items: ChatTraceItem[] = [];
-	const reasoningText = message.turnTrace?.reasoningText?.trim() || message.reasoningTrace?.trim() || undefined;
-	if (reasoningText) {
-		items.push({ id: `${message.id}-reasoning`, kind: "reasoning", text: reasoningText });
-	}
-	for (const activity of message.turnTrace?.activities ?? []) {
-		items.push({ id: activity.id, kind: "activity", activity });
-	}
-	for (const entry of (message.turnTrace?.completedMessages ?? []).slice(0, -1)) {
-		if (!entry.trim()) {
-			continue;
-		}
-		items.push({
-			id: `${message.id}-message-${items.length}`,
-			kind: "message",
-			text: entry
-		});
-	}
-	return { items, durationMs: message.turnTrace?.durationMs };
-}
-
-function getExecutionLogTrace(plugin: CodexAssistantPlugin, message: ChatMessage): { items: ChatTraceItem[]; durationMs?: number } | null {
-	if (message.role !== "assistant" || message.isStreaming) {
-		return null;
-	}
-	const executionLog = plugin.getExecutionLogForAssistantMessage(message);
-	if (!executionLog || executionLog.rawEvents.length === 0) {
-		return null;
-	}
-	const accumulator = new CodexStreamAccumulator();
-	for (const rawEvent of executionLog.rawEvents) {
-		const payload = rawEvent.payload;
-		if (!payload || typeof payload !== "object" || typeof (payload as { type?: unknown }).type !== "string") {
-			continue;
-		}
-		accumulator.apply(payload as never);
-	}
-	const items = accumulator.getLiveState().traceItems;
-	if (items.length === 0) {
-		return null;
-	}
-	return {
-		items,
-		durationMs: Number.isFinite(executionLog.durationMs) ? executionLog.durationMs : message.turnTrace?.durationMs
-	};
-}
-
-function hasStoredTurnTrace(plugin: CodexAssistantPlugin, message: ChatMessage): boolean {
-	return getStoredTurnTrace(plugin, message).items.length > 0;
-}
-
-function metaLabelForMessage(message: ChatMessage): string {
-	if (message.role === "assistant" || message.role === "user" || message.role === "skill") {
-		return "";
-	}
-	return `${message.role}${message.isStreaming ? " - running..." : ""}`;
-}
-
-function getStreamingStatusLabel(items: ChatTraceItem[]): string {
-	for (let index = items.length - 1; index >= 0; index -= 1) {
-		const item = items[index];
-		if (!item) {
-			continue;
-		}
-		if (item.kind === "activity" && item.activity) {
-			return item.activity.kind === "todo_list" ? "Updating plan" : "Using tools";
-		}
-		if (item.kind === "message") {
-			return item.isDraft ? "Drafting response" : "Sharing progress";
-		}
-		if (item.kind === "reasoning") {
-			return "Thinking";
-		}
-	}
-	return "Working";
-}
-
-function formatDuration(durationMs: number): string {
-	const totalSeconds = Math.max(1, Math.round(durationMs / 1000));
-	const minutes = Math.floor(totalSeconds / 60);
-	const seconds = totalSeconds % 60;
-	if (minutes <= 0) {
-		return `${seconds}s`;
-	}
-	if (seconds === 0) {
-		return `${minutes}m`;
-	}
-	return `${minutes}m ${seconds}s`;
-}
-
-function formatReasoningLabel(value: string): string {
-	if (value === "xhigh") {
-		return "X-high";
-	}
-	return value
-		.split(/[-_\s]+/)
-		.filter((part) => part.length > 0)
-		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-		.join(" ");
-}
-
-function formatSandboxModeShortLabel(mode: SandboxMode): string {
-	if (mode === "read-only") {
-		return "Read";
-	}
-	if (mode === "workspace-write") {
-		return "Write";
-	}
-	return "Danger";
-}
-
-function summarizeNotePath(path: string): string {
-	const trimmed = path.trim();
-	if (!trimmed) {
-		return "";
-	}
-	const segments = trimmed.split("/").filter((segment) => segment.length > 0);
-	const fileName = segments[segments.length - 1] ?? trimmed;
-	return fileName.endsWith(".md") ? fileName.slice(0, -3) : fileName;
-}
-
-function iconForActivity(kind: ChatActivity["kind"]): string {
-	switch (kind) {
-		case "command_execution":
-			return "terminal";
-		case "todo_list":
-			return "list-todo";
-		case "web_search":
-			return "search";
-		case "mcp_tool_call":
-			return "plug";
-		case "file_change":
-			return "file-pen";
-		case "error":
-			return "alert-triangle";
-		default:
-			return "dot";
-	}
-}
-
-function labelForActivityStatus(status: ChatActivity["status"]): string {
-	if (status === "completed") {
-		return "Done";
-	}
-	if (status === "failed") {
-		return "Failed";
-	}
-	if (status === "info") {
-		return "Updated";
-	}
-	return "Running";
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
