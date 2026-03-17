@@ -1,6 +1,6 @@
 import { ItemView, MarkdownRenderer, Notice, setIcon, type WorkspaceLeaf } from "obsidian";
 import { render } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type QuickSkillsPlugin from "../main";
 import { CodexStreamAccumulator } from "../codex/streamAccumulator";
 import type { AppViewUpdate } from "../state/uiChange";
@@ -43,6 +43,32 @@ export class QuickSkillsView extends ItemView {
 				return;
 			}
 			closeOpenPopoverMenus(contentEl);
+		});
+		this.registerDomEvent(contentEl, "click", (event: MouseEvent) => {
+			const target = event.target;
+			if (!(target instanceof Element)) {
+				return;
+			}
+			const internalLink = target.closest<HTMLAnchorElement>("a.internal-link");
+			if (!internalLink) {
+				return;
+			}
+			const linkText = (
+				internalLink.getAttribute("data-href")
+				?? internalLink.getAttribute("href")
+				?? internalLink.textContent
+				?? ""
+			).trim();
+			if (!linkText || /^(?:https?:|mailto:|obsidian:)/u.test(linkText)) {
+				return;
+			}
+			event.preventDefault();
+			event.stopPropagation();
+			void this.plugin.app.workspace.openLinkText(
+				linkText,
+				this.plugin.getMarkdownRenderSourcePath(),
+				false
+			);
 		});
 		render(
 			<SidebarApp
@@ -97,7 +123,23 @@ function SidebarApp(props: {
 	const applicableSkills = plugin.getApplicableSkills();
 	const activeSessionId = plugin.activeSessionId;
 	const activeSession = plugin.getActiveSessionSummary();
+	const markdownSourcePath = plugin.getMarkdownRenderSourcePath();
 	const controlsBlocked = plugin.isRunning || dictation.isBusy;
+	const handleToggleReasoning = useCallback((messageId: string) => {
+		setExpandedReasoningMessageIds((current) => {
+			const next = new Set(current);
+			if (next.has(messageId)) {
+				next.delete(messageId);
+			} else {
+				next.add(messageId);
+				setPendingScrollMessageId(messageId);
+			}
+			return next;
+		});
+	}, []);
+	const handleScrollHandled = useCallback(() => {
+		setPendingScrollMessageId(null);
+	}, []);
 
 	useEffect(() => {
 		const visibleIds = new Set<string>();
@@ -140,28 +182,16 @@ function SidebarApp(props: {
 				plugin={plugin}
 				view={view}
 				messages={messages}
+				markdownSourcePath={markdownSourcePath}
 				transcriptRef={transcriptRef}
 				expandedActivityIds={expandedActivityIds}
 				collapsedActivityIds={collapsedActivityIds}
 				setExpandedActivityIds={setExpandedActivityIds}
 				setCollapsedActivityIds={setCollapsedActivityIds}
 				expandedReasoningMessageIds={expandedReasoningMessageIds}
-				onToggleReasoning={(messageId) => {
-					setExpandedReasoningMessageIds((current) => {
-						const next = new Set(current);
-						if (next.has(messageId)) {
-							next.delete(messageId);
-						} else {
-							next.add(messageId);
-							setPendingScrollMessageId(messageId);
-						}
-						return next;
-					});
-				}}
+				onToggleReasoning={handleToggleReasoning}
 				pendingScrollMessageId={pendingScrollMessageId}
-				onScrollHandled={() => {
-					setPendingScrollMessageId(null);
-				}}
+				onScrollHandled={handleScrollHandled}
 			/>
 			<Composer
 				plugin={plugin}
@@ -285,6 +315,7 @@ function TranscriptPane(props: {
 	plugin: QuickSkillsPlugin;
 	view: QuickSkillsView;
 	messages: ChatMessage[];
+	markdownSourcePath: string;
 	transcriptRef: { current: HTMLDivElement | null };
 	expandedActivityIds: Set<string>;
 	collapsedActivityIds: Set<string>;
@@ -299,6 +330,7 @@ function TranscriptPane(props: {
 		plugin,
 		view,
 		messages,
+		markdownSourcePath,
 		transcriptRef,
 		expandedActivityIds,
 		collapsedActivityIds,
@@ -331,8 +363,9 @@ function TranscriptPane(props: {
 					key={message.id}
 					plugin={plugin}
 					view={view}
-					message={message}
-					expandedActivityIds={expandedActivityIds}
+				message={message}
+				markdownSourcePath={markdownSourcePath}
+				expandedActivityIds={expandedActivityIds}
 					collapsedActivityIds={collapsedActivityIds}
 					setExpandedActivityIds={setExpandedActivityIds}
 					setCollapsedActivityIds={setCollapsedActivityIds}
@@ -350,6 +383,7 @@ function MessageRow(props: {
 	plugin: QuickSkillsPlugin;
 	view: QuickSkillsView;
 	message: ChatMessage;
+	markdownSourcePath: string;
 	expandedActivityIds: Set<string>;
 	collapsedActivityIds: Set<string>;
 	setExpandedActivityIds: (value: Set<string> | ((current: Set<string>) => Set<string>)) => void;
@@ -361,6 +395,7 @@ function MessageRow(props: {
 		plugin,
 		view,
 		message,
+		markdownSourcePath,
 		expandedActivityIds,
 		collapsedActivityIds,
 		setExpandedActivityIds,
@@ -384,6 +419,7 @@ function MessageRow(props: {
 									plugin={plugin}
 									view={view}
 									items={trace.items}
+									markdownSourcePath={markdownSourcePath}
 									expandedActivityIds={expandedActivityIds}
 									collapsedActivityIds={collapsedActivityIds}
 									setExpandedActivityIds={setExpandedActivityIds}
@@ -427,6 +463,7 @@ function MessageRow(props: {
 												plugin={plugin}
 												view={view}
 												items={trace.items}
+												markdownSourcePath={markdownSourcePath}
 												expandedActivityIds={expandedActivityIds}
 												collapsedActivityIds={collapsedActivityIds}
 												setExpandedActivityIds={setExpandedActivityIds}
@@ -441,7 +478,13 @@ function MessageRow(props: {
 									</div>
 								) : null}
 								<div class="quick-skills-final-message">
-									<MarkdownBlock app={plugin.app} host={view} text={message.content} className="quick-skills-final-message-content markdown-rendered" />
+									<MarkdownBlock
+										app={plugin.app}
+										sourcePath={markdownSourcePath}
+										host={view}
+										text={message.content}
+										className="quick-skills-final-message-content markdown-rendered"
+									/>
 									<div class="quick-skills-message-actions-inline">
 										<ActionIcon
 											icon="copy"
@@ -486,7 +529,7 @@ function MessageRow(props: {
 					) : message.role === "error" ? (
 						<pre class="quick-skills-message-plain">{message.content}</pre>
 					) : (
-						<MarkdownBlock app={plugin.app} host={view} text={message.content} />
+						<MarkdownBlock app={plugin.app} sourcePath={markdownSourcePath} host={view} text={message.content} />
 					)}
 				</div>
 			</div>
@@ -498,12 +541,22 @@ function TraceItems(props: {
 	plugin: QuickSkillsPlugin;
 	view: QuickSkillsView;
 	items: ChatTraceItem[];
+	markdownSourcePath: string;
 	expandedActivityIds: Set<string>;
 	collapsedActivityIds: Set<string>;
 	setExpandedActivityIds: (value: Set<string> | ((current: Set<string>) => Set<string>)) => void;
 	setCollapsedActivityIds: (value: Set<string> | ((current: Set<string>) => Set<string>)) => void;
 }) {
-	const { plugin, view, items, expandedActivityIds, collapsedActivityIds, setExpandedActivityIds, setCollapsedActivityIds } = props;
+	const {
+		plugin,
+		view,
+		items,
+		markdownSourcePath,
+		expandedActivityIds,
+		collapsedActivityIds,
+		setExpandedActivityIds,
+		setCollapsedActivityIds
+	} = props;
 	return (
 		<>
 			{items
@@ -543,6 +596,7 @@ function TraceItems(props: {
 						<MarkdownBlock
 							key={item.id}
 							app={plugin.app}
+							sourcePath={markdownSourcePath}
 							host={view}
 							text={item.text ?? ""}
 							className={
@@ -807,11 +861,12 @@ function CompactSelect(props: {
 
 function MarkdownBlock(props: {
 	app: QuickSkillsPlugin["app"];
+	sourcePath: string;
 	host: QuickSkillsView;
 	text: string;
 	className?: string;
 }) {
-	const { app, host, text, className } = props;
+	const { app, sourcePath, host, text, className } = props;
 	const ref = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
@@ -821,7 +876,7 @@ function MarkdownBlock(props: {
 		}
 		let cancelled = false;
 		element.empty();
-		void MarkdownRenderer.render(app, text, element, "", host).then(() => {
+		void MarkdownRenderer.render(app, text, element, sourcePath, host).then(() => {
 			if (cancelled) {
 				element.empty();
 			}
@@ -838,17 +893,25 @@ function MarkdownBlock(props: {
 function ActionIcon(props: { icon: string; label: string; onClick: () => Promise<void> }) {
 	const { icon, label, onClick } = props;
 	return (
-		<button
+		<span
 			class="quick-skills-message-action-icon"
-			type="button"
+			role="button"
+			tabIndex={0}
 			aria-label={label}
 			title={label}
 			onClick={() => {
 				void onClick();
 			}}
+			onKeyDown={(event) => {
+				if (event.key !== "Enter" && event.key !== " ") {
+					return;
+				}
+				event.preventDefault();
+				void onClick();
+			}}
 		>
 			<IconSpan icon={icon} />
-		</button>
+		</span>
 	);
 }
 

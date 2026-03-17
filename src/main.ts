@@ -198,6 +198,10 @@ export default class QuickSkillsPlugin extends Plugin {
 		return this.runController.getExecutionLogForAssistantMessage(message);
 	}
 
+	getMarkdownRenderSourcePath(): string {
+		return this.getActiveFile()?.path ?? "";
+	}
+
 	async setSelectedModel(modelId: string): Promise<void> {
 		this.state.settings.selectedModel = modelId;
 		this.normalizeSelectedModelAndReasoning();
