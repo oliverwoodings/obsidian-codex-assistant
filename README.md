@@ -1,7 +1,5 @@
 # Codex Assistant
 
-<img width="1298" height="876" alt="Screenshot 2026-03-18 at 10 01 17" src="https://github.com/user-attachments/assets/f9d71c10-1764-45e5-ac8b-32479879519f" />
-
 Codex Assistant is an Obsidian desktop-only sidebar assistant built explicitly for Codex-native workflows:
 
 - manual chat in a dockable sidebar,
@@ -10,6 +8,8 @@ Codex Assistant is an Obsidian desktop-only sidebar assistant built explicitly f
 - plugin-managed Codex sessions,
 - live structured activity streaming,
 - raw event logging for debugging.
+
+<img width="1298" height="876" alt="Screenshot 2026-03-18 at 10 01 17" src="https://github.com/user-attachments/assets/f9d71c10-1764-45e5-ac8b-32479879519f" />
 
 ## Install and run (development)
 
@@ -69,9 +69,9 @@ Session metadata is enriched from `~/.codex/sessions`, but only for IDs already 
 
 ## Skills
 
-<img width="1295" height="930" alt="Screenshot 2026-03-18 at 10 03 45" src="https://github.com/user-attachments/assets/57f534a6-48e3-43a9-b461-c02e393cace8" />
+Skills become a powerful way to quickly run regular knowledge retrieval and summarization activities across your vault such as meeting prep, weekly progress reports, suggesting next steps on an initiative etc. When executed with write access, they become even more powerful.
 
-Skills are stored in plugin settings and support:
+Skills are configured in plugin settings and support:
 
 - `name`
 - `prompt`
@@ -81,11 +81,9 @@ Skills are stored in plugin settings and support:
 - optional multi-tag frontmatter rule (`OR` matching)
 - manual ordering
 
-Applicability behavior:
+<img width="1295" height="930" alt="Screenshot 2026-03-18 at 10 03 45" src="https://github.com/user-attachments/assets/57f534a6-48e3-43a9-b461-c02e393cace8" />
 
-1. Rule-based skills must match to appear.
-2. Generic skills always appear.
-3. Matching rule-based skills rank ahead of generic ones.
+Skills can be launched either from the button in the conversation box, or from the button in the command ribbon. By leveraging the folder prefixes and frontmatter rules, you can create skills that are only applicable on certain types of notes.
 
 ## Voice dictation
 
