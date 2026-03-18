@@ -1,5 +1,7 @@
 # Codex Assistant
 
+<img width="1298" height="876" alt="Screenshot 2026-03-18 at 10 01 17" src="https://github.com/user-attachments/assets/f9d71c10-1764-45e5-ac8b-32479879519f" />
+
 Codex Assistant is an Obsidian desktop-only sidebar assistant built explicitly for Codex-native workflows:
 
 - manual chat in a dockable sidebar,
@@ -66,6 +68,8 @@ Codex Assistant keeps session isolation at the plugin level and does not expose 
 Session metadata is enriched from `~/.codex/sessions`, but only for IDs already managed by the plugin.
 
 ## Skills
+
+<img width="1295" height="930" alt="Screenshot 2026-03-18 at 10 03 45" src="https://github.com/user-attachments/assets/57f534a6-48e3-43a9-b461-c02e393cace8" />
 
 Skills are stored in plugin settings and support:
 
