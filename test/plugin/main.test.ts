@@ -142,8 +142,8 @@ describe("CodexAssistantPlugin", () => {
 
 		const activateViewSpy = vi.spyOn(plugin, "activateView").mockResolvedValue();
 		(plugin as any).runController = {
-			runManualPrompt: vi.fn(async () => undefined),
-			runSkill: vi.fn(async () => undefined),
+			runManualPrompt: vi.fn(async () => true),
+			runSkill: vi.fn(async () => true),
 		};
 		await plugin.runManualPrompt("Follow up");
 		await plugin.runSkill({ id: "skill-1", name: "Skill", prompt: "Prompt" });

@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type CodexAssistantPlugin from "../main";
 import type { SkillDefinition } from "../types";
 import { SkillEditModal } from "./SkillEditModal";
@@ -36,6 +36,24 @@ export class CodexAssistantSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.codexBinaryPath = value.trim() || "codex";
 					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName("Model catalog")
+			.setDesc(`Available models are loaded from the local Codex cache at \`~/.codex/models_cache.json\` and defaults from \`~/.codex/config.toml\`. The plugin reads that cache on load, so if the Codex app has newer models, refresh here. Currently loaded: ${this.plugin.getAvailableModels().length} model${this.plugin.getAvailableModels().length === 1 ? "" : "s"}.`)
+			.addButton((button) => button
+				.setButtonText("Refresh model cache")
+				.onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText("Refreshing...");
+					try {
+						await this.plugin.refreshAvailableModels();
+						new Notice("Model cache refreshed.");
+						this.display();
+					} finally {
+						button.setDisabled(false);
+						button.setButtonText("Refresh model cache");
+					}
 				}));
 
 		new Setting(containerEl)

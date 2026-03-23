@@ -105,7 +105,7 @@ describe("CodexStreamAccumulator", () => {
 			item: {
 				id: "error-1",
 				type: "error",
-				message: "Something failed",
+				message: "This session was recorded with model `gpt-5.4-mini` but is resuming with `gpt-5.4`. Consider switching back.",
 			},
 		} as never);
 
@@ -128,7 +128,11 @@ describe("CodexStreamAccumulator", () => {
 			expect.objectContaining({
 				id: "error-1",
 				kind: "activity",
-				activity: expect.objectContaining({ title: "Item error", status: "failed", detail: "Something failed" }),
+				activity: expect.objectContaining({
+					title: "Model changed",
+					status: "failed",
+					detail: "This session was recorded with model `gpt-5.4-mini` but is resuming with `gpt-5.4`. Consider switching back.",
+				}),
 			}),
 		]);
 	});

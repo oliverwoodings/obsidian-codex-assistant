@@ -201,16 +201,34 @@ function summarizeProgressItem(item: ThreadItem): ChatActivity | null {
 				detail: item.changes.map((change) => `${change.kind}: ${change.path}`).join("\n") || undefined
 			};
 		case "error":
-			return {
-				id: item.id,
-				kind: "error",
-				status: "failed",
-				title: "Item error",
-				detail: item.message
-			};
+			return summarizeErrorItem(item.id, item.message);
 		default:
 			return null;
 	}
+}
+
+function summarizeErrorItem(id: string, message: string): ChatActivity {
+	const normalizedMessage = message.trim();
+	return {
+		id,
+		kind: "error",
+		status: "failed",
+		title: deriveErrorItemTitle(normalizedMessage),
+		detail: normalizedMessage
+	};
+}
+
+function deriveErrorItemTitle(message: string): string {
+	if (isModelMismatchWarning(message)) {
+		return "Model changed";
+	}
+	return "Error";
+}
+
+function isModelMismatchWarning(message: string): boolean {
+	const normalized = message.toLowerCase();
+	return normalized.includes("this session was recorded with model")
+		&& normalized.includes("resuming with");
 }
 
 function clampTail(value: string, maxChars: number): string {

@@ -48,7 +48,6 @@ function createPluginStub() {
 			buildSessionSummary({ id: "session-2", label: "Session 2" }),
 		],
 		activeSessionId: "session-1",
-		isRunning: false,
 		currentMessages: [
 			buildMessage({ id: "user-1", role: "user", content: "User message" }),
 			buildMessage({
@@ -73,6 +72,19 @@ function createPluginStub() {
 		getCurrentTranscript: vi.fn(() => plugin.currentMessages),
 		getApplicableSkills: vi.fn(() => plugin.currentSkills),
 		getActiveSessionSummary: vi.fn(() => plugin.sessions.find((session) => session.id === plugin.activeSessionId)),
+		sessionRuns: new Set<string>(),
+		getActiveSessionRunState: vi.fn(() => (
+			plugin.sessionRuns.has(plugin.activeSessionId)
+				? {
+					sessionId: plugin.activeSessionId,
+					assistantMessageId: "assistant-live",
+					executionLogId: "run-1",
+					startedAt: 1,
+					cancelRequested: false,
+				}
+				: undefined
+		)),
+		isSessionRunning: vi.fn((sessionId: string) => plugin.sessionRuns.has(sessionId)),
 		getMarkdownRenderSourcePath: vi.fn(() => "Notes/Current.md"),
 		getExecutionLogForAssistantMessage: vi.fn(() => undefined),
 		getAvailableModels: vi.fn(() => [{ id: "gpt-5.3-codex", label: "GPT-5.3", reasoningEfforts: ["low", "high"] }]),
@@ -84,6 +96,7 @@ function createPluginStub() {
 		runManualPrompt: vi.fn(async () => undefined),
 		runSkill: vi.fn(async () => undefined),
 		cancelCurrentRun: vi.fn(),
+		cancelSessionRun: vi.fn(() => false),
 		insertIntoActiveNote: vi.fn(async () => undefined),
 		setSelectedModel: vi.fn(async (value: string) => {
 			plugin.settings.selectedModel = value;
@@ -161,7 +174,7 @@ describe("CodexAssistantView", () => {
 	it("routes internal note links through the workspace and shows stop state while running", async () => {
 		const user = userEvent.setup();
 		const plugin = createPluginStub();
-		plugin.isRunning = true;
+		plugin.sessionRuns.add("session-1");
 		plugin.currentMessages = [
 			buildMessage({
 				id: "assistant-live",
@@ -192,6 +205,7 @@ describe("CodexAssistantView", () => {
 		});
 		await renderView(plugin);
 
+		expect(screen.getByText("Running", { selector: ".codex-assistant-session-status" })).not.toBeNull();
 		expect(screen.getByText("Using tools")).not.toBeNull();
 		expect(screen.getByLabelText("Stop run")).not.toBeNull();
 		await user.click(screen.getByLabelText("Stop run"));

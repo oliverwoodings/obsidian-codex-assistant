@@ -1,5 +1,6 @@
 import { MarkdownView, Notice, Plugin, TFile } from "obsidian";
 import { DEFAULT_REASONING_EFFORTS } from "./codex/constants";
+import { CodexRunExecutor } from "./codex/runExecutor";
 import { CodexService } from "./codex/service";
 import { getActiveMarkdownView, getFrontmatterTags } from "./services/context";
 import { resolveApplicableSkills } from "./services/skillApplicability";
@@ -27,10 +28,6 @@ export default class CodexAssistantPlugin extends Plugin {
 		settings: { ...DEFAULT_SETTINGS },
 		sessions: [],
 		activeSessionId: "",
-		isRunning: false,
-		currentAssistantMessageId: null,
-		currentRunLogId: null,
-		cancelRequested: false,
 		lastFocusedNotePath: null,
 		modelCatalog: { models: [] }
 	};
@@ -53,10 +50,6 @@ export default class CodexAssistantPlugin extends Plugin {
 		return this.state.activeSessionId;
 	}
 
-	get isRunning(): boolean {
-		return this.state.isRunning;
-	}
-
 	async onload(): Promise<void> {
 		this.settingsRepository = new SettingsRepository({
 			loadData: async (): Promise<unknown> => {
@@ -77,7 +70,7 @@ export default class CodexAssistantPlugin extends Plugin {
 		this.runController = new RunController({
 			app: this.app,
 			state: this.state,
-			codex: this.codex,
+			runExecutor: new CodexRunExecutor(() => this.state.settings.codexBinaryPath || "codex"),
 			sessionStore: this.sessionStore,
 			settingsRepository: this.settingsRepository,
 			notifyUi: (change) => this.refreshViews(change),
@@ -145,7 +138,7 @@ export default class CodexAssistantPlugin extends Plugin {
 	}
 
 	onunload(): void {
-		this.runController?.cancelCurrentRun();
+		this.runController?.cancelAllRuns();
 		void this.settingsRepository?.flush(this.state.settings);
 		this.settingTab = null;
 	}
@@ -191,6 +184,11 @@ export default class CodexAssistantPlugin extends Plugin {
 		return this.state.modelCatalog.models;
 	}
 
+	async refreshAvailableModels(): Promise<void> {
+		await this.refreshModelCatalog();
+		this.refreshViews("controls");
+	}
+
 	getReasoningOptionsForModel(modelId: string): string[] {
 		const selected = this.state.modelCatalog.models.find((model) => model.id === modelId);
 		if (selected?.reasoningEfforts.length) {
@@ -209,6 +207,18 @@ export default class CodexAssistantPlugin extends Plugin {
 
 	getExecutionLogForAssistantMessage(message: ChatMessage) {
 		return this.runController.getExecutionLogForAssistantMessage(message);
+	}
+
+	getSessionRunState(sessionId: string) {
+		return this.runController.getSessionRunState(sessionId);
+	}
+
+	getActiveSessionRunState() {
+		return this.runController.getActiveSessionRunState();
+	}
+
+	isSessionRunning(sessionId: string): boolean {
+		return this.runController.isSessionRunning(sessionId);
 	}
 
 	getMarkdownRenderSourcePath(): string {
@@ -237,16 +247,26 @@ export default class CodexAssistantPlugin extends Plugin {
 
 	async runManualPrompt(prompt: string): Promise<void> {
 		await this.activateView();
-		await this.runController.runManualPrompt(prompt);
+		const started = await this.runController.runManualPrompt(prompt);
+		if (!started) {
+			new Notice("This session already has a run in progress.");
+		}
 	}
 
 	async runSkill(skill: SkillDefinition): Promise<void> {
 		await this.activateView();
-		await this.runController.runSkill(skill, this.resolveSkillReasoningEffort(skill), this.resolveSkillSandboxMode(skill));
+		const started = await this.runController.runSkill(skill, this.resolveSkillReasoningEffort(skill), this.resolveSkillSandboxMode(skill));
+		if (!started) {
+			new Notice("This session already has a run in progress.");
+		}
 	}
 
 	cancelCurrentRun(): void {
 		this.runController.cancelCurrentRun();
+	}
+
+	cancelSessionRun(sessionId: string): boolean {
+		return this.runController.cancelSessionRun(sessionId);
 	}
 
 	cancelExecutionLogRun(logId: string): boolean {
@@ -297,7 +317,7 @@ export default class CodexAssistantPlugin extends Plugin {
 		if (!sessionId) {
 			return;
 		}
-		if (this.state.isRunning && sessionId === this.state.activeSessionId) {
+		if (this.runController.isSessionRunning(sessionId)) {
 			new Notice("Stop the current run before archiving this session.");
 			return;
 		}

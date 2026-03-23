@@ -134,8 +134,11 @@ function SidebarApp(props: {
 	const applicableSkills = plugin.getApplicableSkills();
 	const activeSessionId = plugin.activeSessionId;
 	const activeSession = plugin.getActiveSessionSummary();
+	const activeSessionRun = plugin.getActiveSessionRunState();
+	const activeSessionRunning = Boolean(activeSessionRun);
+	const backgroundRunningCount = sessions.filter((session) => plugin.isSessionRunning(session.id) && session.id !== activeSessionId).length;
 	const markdownSourcePath = plugin.getMarkdownRenderSourcePath();
-	const controlsBlocked = plugin.isRunning || dictation.isBusy;
+	const controlsBlocked = activeSessionRunning || dictation.isBusy;
 	const handleToggleReasoning = useCallback((messageId: string) => {
 		setExpandedReasoningMessageIds((current) => {
 			const next = new Set(current);
@@ -186,6 +189,8 @@ function SidebarApp(props: {
 				sessions={sessions}
 				activeSessionId={activeSessionId}
 				activeSession={activeSession}
+				activeSessionRunning={activeSessionRunning}
+				backgroundRunningCount={backgroundRunningCount}
 				contentEl={contentRef.current}
 				transcriptEl={transcriptRef.current}
 			/>
@@ -209,6 +214,7 @@ function SidebarApp(props: {
 				input={input}
 				onInputChange={setInput}
 				controlsBlocked={controlsBlocked}
+				activeSessionRunning={activeSessionRunning}
 				applicableSkills={applicableSkills}
 				contentEl={contentRef.current}
 				transcriptEl={transcriptRef.current}
@@ -231,10 +237,21 @@ function SessionHeader(props: {
 	sessions: SessionSummary[];
 	activeSessionId: string;
 	activeSession?: SessionSummary;
+	activeSessionRunning: boolean;
+	backgroundRunningCount: number;
 	contentEl: HTMLElement | null;
 	transcriptEl: HTMLElement | null;
 }) {
-	const { plugin, sessions, activeSessionId, activeSession, contentEl, transcriptEl } = props;
+	const {
+		plugin,
+		sessions,
+		activeSessionId,
+		activeSession,
+		activeSessionRunning,
+		backgroundRunningCount,
+		contentEl,
+		transcriptEl
+	} = props;
 	const menuRef = useRef<HTMLDetailsElement | null>(null);
 	const summaryRef = useRef<HTMLElement | null>(null);
 
@@ -261,6 +278,18 @@ function SessionHeader(props: {
 						</option>
 					))}
 				</select>
+				{activeSessionRunning || backgroundRunningCount > 0 ? (
+					<span
+						class={`codex-assistant-session-status${activeSessionRunning ? " is-active" : ""}`}
+						title={activeSessionRunning
+							? "The active session is still running."
+							: `${backgroundRunningCount} other session${backgroundRunningCount === 1 ? "" : "s"} are running.`}
+					>
+						{activeSessionRunning
+							? "Running"
+							: `${backgroundRunningCount} background run${backgroundRunningCount === 1 ? "" : "s"}`}
+					</span>
+				) : null}
 				<details
 					ref={menuRef}
 					class="codex-assistant-session-menu codex-assistant-popover-menu"
@@ -678,13 +707,14 @@ function Composer(props: {
 	input: string;
 	onInputChange: (value: string) => void;
 	controlsBlocked: boolean;
+	activeSessionRunning: boolean;
 	applicableSkills: SkillDefinition[];
 	contentEl: HTMLElement | null;
 	transcriptEl: HTMLElement | null;
 	dictation: DictationState;
 	onSubmit: () => Promise<void>;
 }) {
-	const { plugin, input, onInputChange, controlsBlocked, applicableSkills, contentEl, transcriptEl, dictation, onSubmit } = props;
+	const { plugin, input, onInputChange, controlsBlocked, activeSessionRunning, applicableSkills, contentEl, transcriptEl, dictation, onSubmit } = props;
 	const inputRef = useRef<HTMLTextAreaElement | null>(null);
 	const skillMenuRef = useRef<HTMLDetailsElement | null>(null);
 	const skillSummaryRef = useRef<HTMLElement | null>(null);
@@ -720,7 +750,7 @@ function Composer(props: {
 						class={`codex-assistant-toolbar-button codex-assistant-toolbar-button-mic${dictation.state === "recording" ? " is-recording" : ""}${dictation.state === "transcribing" ? " is-transcribing" : ""}`}
 						aria-label={dictation.state === "recording" ? "Stop dictation" : (dictation.state === "transcribing" ? "Transcribing..." : "Start dictation")}
 						title={dictation.state === "recording" ? "Stop dictation" : (dictation.state === "transcribing" ? "Transcribing..." : "Start dictation")}
-						disabled={plugin.isRunning || dictation.state === "transcribing"}
+						disabled={activeSessionRunning || dictation.state === "transcribing"}
 						onClick={() => {
 							void dictation.toggle();
 						}}
@@ -731,7 +761,7 @@ function Composer(props: {
 						ref={skillMenuRef}
 						class="codex-assistant-composer-skill-menu codex-assistant-popover-menu"
 						onToggle={() => {
-							if (plugin.isRunning) {
+							if (activeSessionRunning) {
 								skillMenuRef.current?.removeAttribute("open");
 								return;
 							}
@@ -771,7 +801,7 @@ function Composer(props: {
 						aria-label="Send prompt"
 						title="Send prompt"
 						disabled={controlsBlocked}
-						hidden={plugin.isRunning}
+						hidden={activeSessionRunning}
 						onClick={() => {
 							void onSubmit();
 						}}
@@ -782,7 +812,7 @@ function Composer(props: {
 						class="codex-assistant-toolbar-button codex-assistant-toolbar-button-stop"
 						aria-label="Stop run"
 						title="Stop run"
-						hidden={!plugin.isRunning}
+						hidden={!activeSessionRunning}
 						onClick={() => {
 							plugin.cancelCurrentRun();
 						}}
@@ -965,7 +995,7 @@ function useDictation(plugin: CodexAssistantPlugin, setInput: (value: string | (
 		levels,
 		isBusy: state !== "idle",
 		toggle: async () => {
-			if (plugin.isRunning || state === "transcribing") {
+			if (plugin.getActiveSessionRunState() || state === "transcribing") {
 				return;
 			}
 			if (state === "recording") {

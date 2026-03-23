@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 import { buildSessionContext } from "../services/context";
 import { buildXmlPayload } from "../services/xmlPayload";
-import type { CodexService } from "../codex/service";
+import type { CodexRunExecutor, CodexRunResult } from "../codex/runExecutor";
 import type {
 	ChatMessage,
 	ExecutionLogCodexConfig,
@@ -14,6 +14,8 @@ import type {
 import { createId } from "../utils/id";
 import type { CodexAssistantAppState } from "./appState";
 import { MAX_EXECUTION_LOG_ENTRIES } from "./constants";
+import type { SessionRunSnapshot } from "./sessionRunRegistry";
+import { SessionRunRegistry } from "./sessionRunRegistry";
 import type { SessionStore } from "./sessionStore";
 import type { SettingsRepository } from "./settingsRepository";
 import type { AppViewUpdate } from "./uiChange";
@@ -30,16 +32,17 @@ interface RunMetadata {
 export class RunController {
 	private readonly app: App;
 	private readonly state: CodexAssistantAppState;
-	private readonly codex: CodexService;
+	private readonly runExecutor: CodexRunExecutor;
 	private readonly sessionStore: SessionStore;
 	private readonly settingsRepository: SettingsRepository;
 	private readonly notifyUi: (change: AppViewUpdate) => void;
 	private readonly notifyExecutionLogUpdated: () => void;
+	private readonly runRegistry = new SessionRunRegistry();
 
 	constructor(options: {
 		app: App;
 		state: CodexAssistantAppState;
-		codex: CodexService;
+		runExecutor: CodexRunExecutor;
 		sessionStore: SessionStore;
 		settingsRepository: SettingsRepository;
 		notifyUi: (change: AppViewUpdate) => void;
@@ -47,39 +50,66 @@ export class RunController {
 	}) {
 		this.app = options.app;
 		this.state = options.state;
-		this.codex = options.codex;
+		this.runExecutor = options.runExecutor;
 		this.sessionStore = options.sessionStore;
 		this.settingsRepository = options.settingsRepository;
 		this.notifyUi = options.notifyUi;
 		this.notifyExecutionLogUpdated = options.notifyExecutionLogUpdated;
 	}
 
-	async runManualPrompt(prompt: string): Promise<void> {
+	isSessionRunning(sessionId: string): boolean {
+		return this.runRegistry.isSessionRunning(sessionId);
+	}
+
+	getSessionRunState(sessionId: string): SessionRunSnapshot | undefined {
+		return this.runRegistry.getRun(sessionId);
+	}
+
+	getActiveSessionRunState(): SessionRunSnapshot | undefined {
+		return this.getSessionRunState(this.state.activeSessionId);
+	}
+
+	async runManualPrompt(prompt: string): Promise<boolean> {
 		await this.ensureActiveSession();
+		const requestSessionId = this.state.activeSessionId;
+		if (this.runRegistry.isSessionRunning(requestSessionId)) {
+			return false;
+		}
 		const context = buildSessionContext(this.app, this.state.lastFocusedNotePath);
-		this.sessionStore.appendMessage({
-			id: createId("user"),
-			role: "user",
-			content: prompt,
-			timestamp: Date.now()
-		});
 		const xmlPayload = buildXmlPayload({
 			kind: "manual",
 			prompt,
 			context,
 			globalInstructions: this.state.settings.globalInstructions
 		});
-		await this.runRequest(xmlPayload, {
+		this.sessionStore.appendMessage({
+			id: createId("user"),
+			role: "user",
+			content: prompt,
+			timestamp: Date.now()
+		});
+		return await this.runRequest(requestSessionId, xmlPayload, {
 			requestKind: "manual",
 			prompt,
 			vaultRootPath: context.vaultRootPath
 		});
 	}
 
-	async runSkill(skill: SkillDefinition, reasoningEffort?: string, sandboxMode?: SkillDefinition["sandboxMode"]): Promise<void> {
+	async runSkill(skill: SkillDefinition, reasoningEffort?: string, sandboxMode?: SkillDefinition["sandboxMode"]): Promise<boolean> {
 		await this.ensureActiveSession();
+		const requestSessionId = this.state.activeSessionId;
+		if (this.runRegistry.isSessionRunning(requestSessionId)) {
+			return false;
+		}
 		const context = buildSessionContext(this.app, this.state.lastFocusedNotePath);
 		const renderedPrompt = skill.prompt.trim();
+		const xmlPayload = buildXmlPayload({
+			kind: "skill",
+			skillName: skill.name,
+			prompt: renderedPrompt,
+			context,
+			globalInstructions: this.state.settings.globalInstructions
+		});
 		this.sessionStore.appendMessage({
 			id: createId("skill"),
 			role: "skill",
@@ -88,14 +118,7 @@ export class RunController {
 			content: renderedPrompt,
 			timestamp: Date.now()
 		});
-		const xmlPayload = buildXmlPayload({
-			kind: "skill",
-			skillName: skill.name,
-			prompt: renderedPrompt,
-			context,
-			globalInstructions: this.state.settings.globalInstructions
-		});
-		await this.runRequest(xmlPayload, {
+		return await this.runRequest(requestSessionId, xmlPayload, {
 			requestKind: "skill",
 			prompt: renderedPrompt,
 			skillName: skill.name,
@@ -106,24 +129,48 @@ export class RunController {
 	}
 
 	cancelCurrentRun(): void {
-		if (this.state.isRunning) {
-			this.state.cancelRequested = true;
+		const run = this.getActiveSessionRunState();
+		if (!run) {
+			return;
 		}
-		this.codex.cancel();
-		this.state.isRunning = false;
-		if (this.state.currentAssistantMessageId) {
-			this.sessionStore.finishAssistantMessage(this.state.currentAssistantMessageId);
-		}
-		this.settingsRepository.saveSoon(this.state.settings);
+		this.sessionStore.finishAssistantMessage(run.assistantMessageId);
+		this.runRegistry.cancelRun(run.sessionId);
 		this.notifyUi("controls");
 	}
 
-	cancelExecutionLogRun(logId: string): boolean {
-		if (!this.state.isRunning || this.state.currentRunLogId !== logId) {
+	cancelSessionRun(sessionId: string): boolean {
+		const run = this.runRegistry.getRun(sessionId);
+		if (!run) {
 			return false;
 		}
-		this.cancelCurrentRun();
-		return true;
+		this.sessionStore.finishAssistantMessage(run.assistantMessageId);
+		const cancelled = this.runRegistry.cancelRun(sessionId);
+		if (cancelled) {
+			this.notifyUi("controls");
+		}
+		return cancelled;
+	}
+
+	cancelExecutionLogRun(logId: string): boolean {
+		const sessionId = this.runRegistry.findSessionIdByExecutionLogId(logId);
+		if (!sessionId) {
+			return false;
+		}
+		return this.cancelSessionRun(sessionId);
+	}
+
+	cancelAllRuns(): void {
+		const runningSessionIds = this.runRegistry.getRunningSessionIds();
+		for (const sessionId of runningSessionIds) {
+			const run = this.runRegistry.getRun(sessionId);
+			if (run) {
+				this.sessionStore.finishAssistantMessage(run.assistantMessageId);
+			}
+		}
+		this.runRegistry.cancelAllRuns();
+		if (runningSessionIds.length > 0) {
+			this.notifyUi("controls");
+		}
 	}
 
 	getExecutionLogForAssistantMessage(message: ChatMessage): ExecutionLogEntry | undefined {
@@ -137,9 +184,11 @@ export class RunController {
 		));
 	}
 
-	private async runRequest(xmlPayload: string, metadata: RunMetadata): Promise<void> {
-		await this.ensureActiveSession();
-		const requestSessionId = this.state.activeSessionId;
+	private async runRequest(
+		requestSessionId: string,
+		xmlPayload: string,
+		metadata: RunMetadata
+	): Promise<boolean> {
 		const runStartedAt = Date.now();
 		const logId = this.startExecutionLog({
 			sessionId: requestSessionId,
@@ -148,9 +197,7 @@ export class RunController {
 			prompt: metadata.prompt,
 			xmlPayload
 		});
-		this.state.currentRunLogId = logId;
 		const assistantMessageId = createId("assistant");
-		this.state.currentAssistantMessageId = assistantMessageId;
 		this.sessionStore.appendMessage({
 			id: assistantMessageId,
 			role: "assistant",
@@ -160,10 +207,7 @@ export class RunController {
 			isStreaming: true
 		});
 
-		this.state.isRunning = true;
-		this.state.cancelRequested = false;
-		this.notifyUi("controls");
-		const result = await this.codex.run({
+		const handle = this.runExecutor.startRun({
 			xmlPayload,
 			sessionId: requestSessionId,
 			model: this.state.settings.selectedModel,
@@ -184,36 +228,62 @@ export class RunController {
 				this.sessionStore.replaceAssistantMessage(assistantMessageId, content);
 			}
 		});
-		this.sessionStore.finishAssistantMessage(assistantMessageId);
-		if (result.errorMessage && !result.cancelled) {
-			this.sessionStore.appendMessage({
-				id: createId("error"),
-				role: "error",
-				content: result.errorMessage,
-				timestamp: Date.now()
-			});
+
+		if (!this.runRegistry.beginRun(requestSessionId, {
+			assistantMessageId,
+			executionLogId: logId,
+			startedAt: runStartedAt,
+			cancelRequested: false,
+			cancel: handle.cancel
+		})) {
+			handle.cancel();
+			return false;
 		}
-		if (result.sessionId && result.sessionId !== requestSessionId) {
-			await this.sessionStore.adoptResolvedSessionId(requestSessionId, result.sessionId);
-			this.setExecutionLogSession(logId, result.sessionId);
-		}
-		const assistantMessage = this.sessionStore.findMessageById(assistantMessageId);
-		const durationMs = Date.now() - runStartedAt;
-		this.sessionStore.setAssistantTurnDuration(assistantMessageId, durationMs);
-		const finalStatus: ExecutionLogStatus = (this.state.cancelRequested || result.cancelled)
-			? "stopped"
-			: (result.errorMessage ? "error" : "success");
-		this.completeExecutionLog(logId, {
-			status: finalStatus,
-			response: result.finalContent || (assistantMessage?.content ?? ""),
-			errorMessage: result.errorMessage,
-			durationMs
-		});
-		this.state.isRunning = false;
-		this.state.currentRunLogId = null;
-		this.state.cancelRequested = false;
-		await this.settingsRepository.saveNow(this.state.settings);
+
 		this.notifyUi("controls");
+
+		let result: CodexRunResult;
+		let finalSessionId = requestSessionId;
+		try {
+			result = await handle.promise;
+			finalSessionId = result.sessionId && result.sessionId !== requestSessionId
+				? result.sessionId
+				: requestSessionId;
+			if (result.sessionId && result.sessionId !== requestSessionId) {
+				this.runRegistry.adoptResolvedSessionId(requestSessionId, result.sessionId);
+				await this.sessionStore.adoptResolvedSessionId(requestSessionId, result.sessionId);
+				this.setExecutionLogSession(logId, result.sessionId);
+			}
+			this.sessionStore.finishAssistantMessage(assistantMessageId);
+			if (result.errorMessage && !result.cancelled) {
+				this.sessionStore.appendMessage({
+					id: createId("error"),
+					role: "error",
+					content: result.errorMessage,
+					timestamp: Date.now()
+				});
+			}
+			const assistantMessage = this.sessionStore.findMessageById(assistantMessageId);
+			const durationMs = Date.now() - runStartedAt;
+			this.sessionStore.setAssistantTurnDuration(assistantMessageId, durationMs);
+			const runState = this.runRegistry.getRun(finalSessionId) ?? this.runRegistry.getRun(requestSessionId);
+			const finalStatus: ExecutionLogStatus = (runState?.cancelRequested || result.cancelled)
+				? "stopped"
+				: (result.errorMessage ? "error" : "success");
+			this.completeExecutionLog(logId, {
+				status: finalStatus,
+				response: result.finalContent || (assistantMessage?.content ?? ""),
+				errorMessage: result.errorMessage,
+				durationMs
+			});
+			return true;
+		} finally {
+			if (!this.runRegistry.completeRun(finalSessionId)) {
+				this.runRegistry.completeRun(requestSessionId);
+			}
+			await this.settingsRepository.saveNow(this.state.settings);
+			this.notifyUi("controls");
+		}
 	}
 
 	private async ensureActiveSession(): Promise<void> {

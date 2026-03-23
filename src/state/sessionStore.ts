@@ -110,7 +110,6 @@ export class SessionStore {
 		if (message) {
 			message.isStreaming = false;
 		}
-		this.state.currentAssistantMessageId = null;
 		this.settingsRepository.saveSoon(this.state.settings);
 		this.notifyUi("transcript");
 	}
