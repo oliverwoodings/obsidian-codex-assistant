@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildXmlPayload } from "../../src/services/xmlPayload";
 
 describe("buildXmlPayload", () => {
-	it("builds a manual prompt payload and omits global instructions when blank", () => {
+	it("builds a manual prompt payload and includes empty global instructions when blank", () => {
 		const payload = buildXmlPayload({
 			kind: "manual",
 			prompt: "Summarize",
@@ -22,7 +22,7 @@ describe("buildXmlPayload", () => {
 		expect(payload).toContain("Wikilinks and note references must always be emitted as normal clickable Markdown");
 		expect(payload).toContain("Bad: `[[Knowledge Conversational]]`");
 		expect(payload).toContain("Before sending your final answer, do a final formatting pass:");
-		expect(payload).not.toContain("<global_instructions>");
+		expect(payload).toContain("<global_instructions><![CDATA[\n\n  ]]></global_instructions>");
 	});
 
 	it("includes skill name, escapes XML attributes, and preserves CDATA bodies", () => {
