@@ -16,6 +16,7 @@ describe("SettingsRepository", () => {
 		const repository = new SettingsRepository({
 			loadData: async () => ({
 				codexBinaryPath: "",
+				extraPathEntries: ["/opt/homebrew/bin", " ", "/opt/homebrew/bin", 42],
 				globalInstructions: 42,
 				sandboxMode: "bad-mode",
 				whisperBaseUrl: "   ",
@@ -75,6 +76,7 @@ describe("SettingsRepository", () => {
 		const loaded = await repository.load();
 
 		expect(loaded.codexBinaryPath).toBe("codex");
+		expect(loaded.extraPathEntries).toEqual(["/opt/homebrew/bin"]);
 		expect(loaded.globalInstructions).toBe(DEFAULT_SETTINGS.globalInstructions);
 		expect(loaded.sandboxMode).toBe("read-only");
 		expect(loaded.whisperBaseUrl).toBe(DEFAULT_SETTINGS.whisperBaseUrl);

@@ -18,6 +18,10 @@ describe("buildXmlPayload", () => {
 
 		expect(payload).toContain('<prompt kind="manual" name=""><![CDATA[');
 		expect(payload).toContain("Notes/Today.md\nNotes/Other.md");
+		expect(payload).toContain("prefer the shortest vault-relative wikilink");
+		expect(payload).toContain("Wikilinks and note references must always be emitted as normal clickable Markdown");
+		expect(payload).toContain("Bad: `[[Knowledge Conversational]]`");
+		expect(payload).toContain("Before sending your final answer, do a final formatting pass:");
 		expect(payload).not.toContain("<global_instructions>");
 	});
 

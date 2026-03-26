@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: PluginData = {
 	insertMode: "cursor",
 	transcripts: {},
 	codexBinaryPath: "codex",
+	extraPathEntries: [],
 	globalInstructions: "",
 	selectedModel: "gpt-5.3-codex",
 	selectedReasoningEffort: "high",

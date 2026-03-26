@@ -65,6 +65,7 @@ export class SettingsRepository {
 			settings.lastSessionId = settings.managedSessionIds[0] ?? "";
 		}
 		settings.codexBinaryPath = settings.codexBinaryPath || "codex";
+		settings.extraPathEntries = this.normalizeExtraPathEntries(settings.extraPathEntries);
 		settings.globalInstructions = this.normalizeGlobalInstructions(settings.globalInstructions);
 		settings.selectedModel = settings.selectedModel || DEFAULT_SETTINGS.selectedModel;
 		settings.selectedReasoningEffort = settings.selectedReasoningEffort || DEFAULT_SETTINGS.selectedReasoningEffort;
@@ -190,6 +191,24 @@ export class SettingsRepository {
 				continue;
 			}
 			normalized.push(id);
+		}
+		return normalized;
+	}
+
+	private normalizeExtraPathEntries(value: unknown): string[] {
+		if (!Array.isArray(value)) {
+			return [];
+		}
+		const normalized: string[] = [];
+		for (const item of value) {
+			if (typeof item !== "string") {
+				continue;
+			}
+			const entry = item.trim();
+			if (!entry || normalized.includes(entry)) {
+				continue;
+			}
+			normalized.push(entry);
 		}
 		return normalized;
 	}

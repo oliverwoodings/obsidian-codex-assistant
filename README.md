@@ -156,4 +156,5 @@ The log UI renders both pretty JSON config and a JSONL-style raw event stream so
 
 - This plugin is desktop-only.
 - The Codex SDK spawns the configured executable directly. If Obsidian cannot resolve `codex` from its environment, set an absolute path in settings such as `/opt/homebrew/bin/codex`.
+- GUI-launched Obsidian may not inherit your shell PATH. Use **Extra PATH entries** in plugin settings to prepend directories such as `/opt/homebrew/bin` for tools like `node`.
 - Voice dictation expects a local whisper.cpp HTTP server. This can be provided by [whisper-local-runtime](https://github.com/oliverwoodings/whisper-local-runtime) or any compatible whisper.cpp server exposing `/inference`.

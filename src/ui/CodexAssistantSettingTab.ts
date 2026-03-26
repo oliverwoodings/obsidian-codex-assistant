@@ -38,6 +38,26 @@ export class CodexAssistantSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
+		const extraPathSetting = new Setting(containerEl)
+			.setName("Extra PATH entries")
+			.setDesc("Optional absolute paths to prepend to PATH for Codex runs. Add one directory per line so GUI-launched Obsidian can find tools like node.")
+			.addTextArea((text) => {
+				text
+					.setPlaceholder("/opt/homebrew/bin")
+					.setValue(this.plugin.settings.extraPathEntries.join("\n"))
+					.onChange(async (value) => {
+						this.plugin.settings.extraPathEntries = value
+							.split(/\r?\n/u)
+							.map((entry) => entry.trim())
+							.filter((entry, index, entries) => entry.length > 0 && entries.indexOf(entry) === index);
+						await this.plugin.saveSettings();
+					});
+				text.inputEl.addClass("codex-assistant-settings-textarea");
+				text.inputEl.rows = 4;
+				text.inputEl.setCssProps({ width: "100%" });
+			});
+		extraPathSetting.settingEl.addClass("codex-assistant-setting-item-full-width");
+
 		new Setting(containerEl)
 			.setName("Model catalog")
 			.setDesc(`Available models are loaded from the local Codex cache at \`~/.codex/models_cache.json\` and defaults from \`~/.codex/config.toml\`. The plugin reads that cache on load, so if the Codex app has newer models, refresh here. Currently loaded: ${this.plugin.getAvailableModels().length} model${this.plugin.getAvailableModels().length === 1 ? "" : "s"}.`)
@@ -56,7 +76,7 @@ export class CodexAssistantSettingTab extends PluginSettingTab {
 					}
 				}));
 
-		new Setting(containerEl)
+		const globalInstructionsSetting = new Setting(containerEl)
 			.setName("Global instructions")
 			.setDesc("Optional instructions applied to every prompt and skill run.")
 			.addTextArea((text) => {
@@ -67,9 +87,11 @@ export class CodexAssistantSettingTab extends PluginSettingTab {
 						this.plugin.settings.globalInstructions = value;
 						await this.plugin.saveSettings();
 					});
+				text.inputEl.addClass("codex-assistant-settings-textarea");
 				text.inputEl.rows = 6;
 				text.inputEl.setCssProps({ width: "100%" });
 			});
+		globalInstructionsSetting.settingEl.addClass("codex-assistant-setting-item-full-width");
 
 		new Setting(containerEl)
 			.setName("Voice dictation")

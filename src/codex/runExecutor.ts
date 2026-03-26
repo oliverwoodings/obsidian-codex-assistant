@@ -25,9 +25,11 @@ export interface CodexRunHandle {
 
 export class CodexRunExecutor {
 	private readonly codexBinaryPath: () => string;
+	private readonly extraPathEntries: () => string[];
 
-	constructor(codexBinaryPath: () => string) {
+	constructor(codexBinaryPath: () => string, extraPathEntries: () => string[] = () => []) {
 		this.codexBinaryPath = codexBinaryPath;
+		this.extraPathEntries = extraPathEntries;
 	}
 
 	startRun(request: RunRequest, handlers: CodexRunHandlers): CodexRunHandle {
@@ -47,6 +49,7 @@ export class CodexRunExecutor {
 
 		const codex = new Codex({
 			codexPathOverride: executablePath,
+			env: buildCodexEnvironment(this.extraPathEntries()),
 			config: RAW_REASONING_CONFIG
 		});
 		const threadOptions = this.buildThreadOptions(request);
@@ -127,6 +130,38 @@ export class CodexRunExecutor {
 			payload
 		};
 	}
+}
+
+export function buildCodexEnvironment(extraPathEntries: string[]): Record<string, string> {
+	const env = copyProcessEnvironment();
+	const mergedPath = mergePathEntries(extraPathEntries, env.PATH);
+	if (mergedPath) {
+		env.PATH = mergedPath;
+	}
+	return env;
+}
+
+function copyProcessEnvironment(): Record<string, string> {
+	const env: Record<string, string> = {};
+	for (const [key, value] of Object.entries(process.env)) {
+		if (value !== undefined) {
+			env[key] = value;
+		}
+	}
+	return env;
+}
+
+function mergePathEntries(extraPathEntries: string[], existingPath: string | undefined): string {
+	const pathDelimiter = process.platform === "win32" ? ";" : ":";
+	const normalized = extraPathEntries
+		.map((entry) => entry.trim())
+		.filter((entry) => entry.length > 0);
+	const existingEntries = (existingPath ?? "")
+		.split(pathDelimiter)
+		.map((entry) => entry.trim())
+		.filter((entry) => entry.length > 0);
+	const merged = new Set<string>([...normalized, ...existingEntries]);
+	return Array.from(merged).join(pathDelimiter);
 }
 
 function normalizeReasoningEffort(value: string | undefined): ModelReasoningEffort | undefined {

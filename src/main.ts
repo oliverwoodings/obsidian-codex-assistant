@@ -70,7 +70,10 @@ export default class CodexAssistantPlugin extends Plugin {
 		this.runController = new RunController({
 			app: this.app,
 			state: this.state,
-			runExecutor: new CodexRunExecutor(() => this.state.settings.codexBinaryPath || "codex"),
+			runExecutor: new CodexRunExecutor(
+				() => this.state.settings.codexBinaryPath || "codex",
+				() => this.state.settings.extraPathEntries ?? []
+			),
 			sessionStore: this.sessionStore,
 			settingsRepository: this.settingsRepository,
 			notifyUi: (change) => this.refreshViews(change),

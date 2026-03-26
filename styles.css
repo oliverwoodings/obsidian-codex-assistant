@@ -1028,6 +1028,28 @@
 	margin: 0;
 }
 
+.codex-assistant-setting-item-full-width {
+	display: block;
+}
+
+.codex-assistant-setting-item-full-width .setting-item-info {
+	max-width: none;
+	margin-right: 0;
+}
+
+.codex-assistant-setting-item-full-width .setting-item-control {
+	width: 100%;
+	margin-top: 12px;
+}
+
+.codex-assistant-setting-item-full-width .setting-item-control .codex-assistant-settings-textarea,
+.codex-assistant-setting-item-full-width > .codex-assistant-settings-textarea {
+	display: block;
+	width: 100%;
+	min-width: 100%;
+	box-sizing: border-box;
+}
+
 .modal.codex-assistant-skill-modal-shell {
 	width: min(760px, calc(100vw - 48px));
 	max-width: calc(100vw - 32px);
